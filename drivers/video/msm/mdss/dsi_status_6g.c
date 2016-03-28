@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -128,11 +128,9 @@ void mdss_check_dsi_ctrl_status(struct work_struct *work, uint32_t interval)
 	if (mipi->mode == DSI_CMD_MODE && ctrl_pdata->status_mode == ESD_BTA)
 		mutex_lock(&mdp5_data->ov_lock);
 	mutex_lock(&ctl->offlock);
-	mutex_lock(&ctrl_pdata->mutex);
 
 	if (mdss_panel_is_power_off(pstatus_data->mfd->panel_power_state) ||
 			pstatus_data->mfd->shutdown_pending) {
-		mutex_unlock(&ctrl_pdata->mutex);
 		mutex_unlock(&ctl->offlock);
 		if (mipi->mode == DSI_CMD_MODE &&
 				ctrl_pdata->status_mode == ESD_BTA)
@@ -163,7 +161,6 @@ void mdss_check_dsi_ctrl_status(struct work_struct *work, uint32_t interval)
 	ret = ctrl_pdata->check_status(ctrl_pdata);
 	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF);
 
-	mutex_unlock(&ctrl_pdata->mutex);
 	mutex_unlock(&ctl->offlock);
 	if (mipi->mode == DSI_CMD_MODE && ctrl_pdata->status_mode == ESD_BTA)
 		mutex_unlock(&mdp5_data->ov_lock);
