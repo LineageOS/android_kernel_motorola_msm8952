@@ -564,10 +564,6 @@ CDEFINES += -DWCN_PRONTO
 CDEFINES += -DWCN_PRONTO_V1
 endif
 
-ifeq ($(ENABLE_DRIVER_VERBOSE),1)
-CDEFINES += -DENABLE_DRIVER_VERBOSE
-endif
-
 ifeq ($(BUILD_DEBUG_VERSION),1)
 CDEFINES +=	-DWLAN_DEBUG \
 		-DTRACE_RECORD \
@@ -611,9 +607,6 @@ endif
 
 ifeq ($(CONFIG_PRIMA_WLAN_LFR),y)
 CDEFINES += -DFEATURE_WLAN_LFR
-#Begin fjdw67 Motorola, IKJB42MAIN-6385 - LFR roaming instrumentation
-CDEFINES += -DFEATURE_WLAN_LFR_METRICS
-#End IKJB42MAIN-6385
 endif
 
 ifeq ($(CONFIG_PRIMA_WLAN_OKC),y)
@@ -632,9 +625,6 @@ endif
 
 # enable the MAC Address auto-generation feature
 CDEFINES += -DWLAN_AUTOGEN_MACADDR_FEATURE
-
-# Moto read MACs from boot params instead of NV file
-CDEFINES += -DMOTO_UTAGS_MAC
 
 ifeq ($(CONFIG_WLAN_FEATURE_11W),y)
 CDEFINES += -DWLAN_FEATURE_11W
