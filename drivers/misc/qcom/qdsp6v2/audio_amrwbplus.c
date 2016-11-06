@@ -14,8 +14,11 @@
  * GNU General Public License for more details.
  *
  */
+
+#include <linux/types.h>
 #include <linux/msm_audio_amrwbplus.h>
 #include <linux/compat.h>
+#include <linux/wakelock.h>
 #include "audio_utils_aio.h"
 
 static struct miscdevice audio_amrwbplus_misc;

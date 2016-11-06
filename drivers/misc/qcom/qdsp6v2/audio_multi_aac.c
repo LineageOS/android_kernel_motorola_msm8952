@@ -15,8 +15,10 @@
  *
  */
 
+#include <linux/types.h>
 #include <linux/msm_audio_aac.h>
 #include <linux/compat.h>
+#include <linux/wakelock.h>
 #include <soc/qcom/socinfo.h>
 #include "audio_utils_aio.h"
 
