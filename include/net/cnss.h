@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -15,11 +15,11 @@
 #include <linux/device.h>
 #include <linux/skbuff.h>
 #include <linux/pci.h>
-#ifdef CONFIG_CNSS_SDIO
-#include <linux/mmc/sdio_func.h>
-#endif
 
 #ifdef CONFIG_CNSS
+/* max 20mhz channel count */
+#define CNSS_MAX_CH_NUM       45
+
 #define CNSS_MAX_FILE_NAME	  20
 
 #define MAX_FIRMWARE_SIZE (1 * 1024 * 1024)
@@ -115,6 +115,11 @@ enum cnss_runtime_request {
 extern int cnss_get_fw_image(struct image_desc_info *image_desc_info);
 extern void cnss_runtime_init(struct device *dev, int auto_delay);
 extern void cnss_runtime_exit(struct device *dev);
+extern void cnss_device_crashed(void);
+extern void cnss_device_self_recovery(void);
+extern int cnss_get_ramdump_mem(unsigned long *address, unsigned long *size);
+extern void *cnss_get_virt_ramdump_mem(unsigned long *size);
+extern void cnss_schedule_recovery_work(void);
 extern void cnss_wlan_pci_link_down(void);
 extern int cnss_pcie_shadow_control(struct pci_dev *dev, bool enable);
 extern int cnss_wlan_register_driver(struct cnss_wlan_driver *driver);
@@ -160,9 +165,6 @@ extern int cnss_is_auto_suspend_allowed(const char *caller_func);
 extern int cnss_pm_runtime_request(struct device *dev, enum
 		cnss_runtime_request request);
 #endif
-/* max 20mhz channel count */
-#define CNSS_MAX_CH_NUM       45
-
 extern void cnss_init_work(struct work_struct *work, work_func_t func);
 extern void cnss_flush_work(void *work);
 extern void cnss_flush_delayed_work(void *dwork);
@@ -183,41 +185,4 @@ extern int cnss_get_wlan_unsafe_channel(u16 *unsafe_ch_list,
 		u16 *ch_count, u16 buf_len);
 extern int cnss_wlan_set_dfs_nol(const void *info, u16 info_len);
 extern int cnss_wlan_get_dfs_nol(void *info, u16 info_len);
-extern void cnss_device_crashed(void);
-extern void cnss_device_self_recovery(void);
-extern int cnss_get_ramdump_mem(unsigned long *address, unsigned long *size);
-extern void *cnss_get_virt_ramdump_mem(unsigned long *size);
-extern void cnss_schedule_recovery_work(void);
-
-enum {
-	CNSS_RESET_SOC = 0,
-	CNSS_RESET_SUBSYS_COUPLED,
-	CNSS_RESET_LEVEL_MAX
-};
-extern int cnss_get_restart_level(void);
-
-#ifdef CONFIG_CNSS_SDIO
-struct cnss_sdio_wlan_driver {
-	const char *name;
-	const struct sdio_device_id *id_table;
-	int (*probe)(struct sdio_func *, const struct sdio_device_id *);
-	void (*remove)(struct sdio_func *);
-	int (*reinit)(struct sdio_func *, const struct sdio_device_id *);
-	void (*shutdown)(struct sdio_func *);
-	void (*crash_shutdown)(struct sdio_func *);
-	int (*suspend)(struct device *);
-	int (*resume)(struct device *);
-};
-
-extern int cnss_sdio_wlan_register_driver(
-	struct cnss_sdio_wlan_driver *driver);
-extern void cnss_sdio_wlan_unregister_driver(
-	struct cnss_sdio_wlan_driver *driver);
-
-typedef void (*oob_irq_handler_t)(void *dev_para);
-extern int cnss_wlan_query_oob_status(void);
-extern int cnss_wlan_register_oob_irq_handler(oob_irq_handler_t handler,
-	    void *pm_oob);
-extern int cnss_wlan_unregister_oob_irq_handler(void *pm_oob);
-#endif
 #endif /* _NET_CNSS_H_ */
