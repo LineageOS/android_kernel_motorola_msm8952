@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -441,7 +441,8 @@ static int rmnet_map_egress_handler(struct sk_buff *skb,
 		rmnet_stats_ul_checksum(ckresult);
 	}
 
-	if (!(config->egress_data_format & RMNET_EGRESS_FORMAT_AGGREGATION))
+	if ((config->egress_data_format & RMNET_EGRESS_FORMAT_MAP_CKSUMV4) &&
+	    (!(config->egress_data_format & RMNET_EGRESS_FORMAT_AGGREGATION)))
 		map_header = rmnet_map_add_map_header
 		(skb, additional_header_length, RMNET_MAP_NO_PAD_BYTES);
 	else
