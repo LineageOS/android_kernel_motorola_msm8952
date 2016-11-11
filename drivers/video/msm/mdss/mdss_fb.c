@@ -56,6 +56,8 @@
 #define CREATE_TRACE_POINTS
 #include "mdss_debug.h"
 
+#include "mdss_livedisplay.h"
+
 #ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
 #define MDSS_FB_NUM 3
 #else
@@ -1102,6 +1104,8 @@ static int mdss_fb_create_sysfs(struct msm_fb_data_type *mfd)
 	rc = mdss_fb_create_param_sysfs(mfd);
 	if (rc)
 		pr_err("panel parameter sysfs creation failed, rc=%d\n", rc);
+
+    return mdss_livedisplay_create_sysfs(mfd);
 
 err:
 	return rc;
