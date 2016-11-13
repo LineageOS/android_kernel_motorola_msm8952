@@ -636,12 +636,11 @@ void diagfwd_close_transport(uint8_t transport, uint8_t peripheral)
 
 	}
 
+	mutex_lock(&driver->diagfwd_channel_mutex);
 	fwd_info = &early_init_info[transport][peripheral];
 	if (fwd_info->p_ops && fwd_info->p_ops->close)
 		fwd_info->p_ops->close(fwd_info->ctxt);
 	fwd_info = &early_init_info[transport_open][peripheral];
-	if (fwd_info->p_ops && fwd_info->p_ops->close)
-		fwd_info->p_ops->close(fwd_info->ctxt);
 	dest_info = &peripheral_info[TYPE_CNTL][peripheral];
 	dest_info->inited = 1;
 	dest_info->ctxt = fwd_info->ctxt;
@@ -659,6 +658,7 @@ void diagfwd_close_transport(uint8_t transport, uint8_t peripheral)
 		diagfwd_late_open(dest_info);
 	diagfwd_cntl_open(dest_info);
 	init_fn(peripheral);
+	mutex_unlock(&driver->diagfwd_channel_mutex);
 	diagfwd_queue_read(&peripheral_info[TYPE_DATA][peripheral]);
 	diagfwd_queue_read(&peripheral_info[TYPE_CMD][peripheral]);
 }
