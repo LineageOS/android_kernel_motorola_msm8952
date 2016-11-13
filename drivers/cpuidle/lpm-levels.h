@@ -1,4 +1,4 @@
-/* Copyright (c) 2014, 2015, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -27,6 +27,8 @@ struct power_params {
 	uint32_t ss_power;		/* Steady state power */
 	uint32_t energy_overhead;	/* Enter + exit over head */
 	uint32_t time_overhead_us;	/* Enter + exit overhead */
+	uint32_t residencies[NR_LPM_LEVELS];
+	uint32_t max_residency;
 };
 
 struct lpm_cpu_level {
@@ -52,6 +54,9 @@ struct lpm_level_avail {
 	struct kobject *kobj;
 	struct kobj_attribute idle_enabled_attr;
 	struct kobj_attribute suspend_enabled_attr;
+	void *data;
+	int idx;
+	bool cpu_node;
 };
 
 struct lpm_cluster_level {
@@ -118,6 +123,7 @@ bool lpm_cluster_mode_allow(struct lpm_cluster *cluster,
 void lpm_cluster_mode_enable(void);
 void lpm_cluster_mode_disable(void);
 
+uint32_t *get_per_cpu_max_residency(int cpu);
 extern struct lpm_cluster *lpm_root_node;
 
 #ifdef CONFIG_SMP
