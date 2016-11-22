@@ -1,3 +1,4 @@
+
 /*
  * FPC1020 Fingerprint sensor device driver
  *
@@ -488,6 +489,20 @@ static int fpc1020_remove(struct spi_device *spi)
 	return 0;
 }
 
+static void set_fingerprintd_nice(int nice)
+{
+	struct task_struct *p;
+
+	read_lock(&tasklist_lock);
+	for_each_process(p) {
+		if (!memcmp(p->comm, "fingerprintd", 13)) {
+			set_user_nice(p, nice);
+			break;
+		}
+	}
+	read_unlock(&tasklist_lock);
+}
+
 static int fpc1020_suspend(struct spi_device *spi, pm_message_t mesg)
 {
 	struct fpc1020_data *fpc1020 = dev_get_drvdata(&spi->dev);
@@ -495,6 +510,7 @@ static int fpc1020_suspend(struct spi_device *spi, pm_message_t mesg)
 	fpc1020->clocks_suspended = fpc1020->clocks_enabled;
 	dev_info(fpc1020->dev, "fpc1020_suspend\n");
 	set_clks(fpc1020, false);
+        set_fingerprintd_nice(-20);
 	return 0;
 }
 
@@ -506,6 +522,8 @@ static int fpc1020_resume(struct spi_device *spi)
 		dev_info(fpc1020->dev, "fpc1020_resume\n");
 		set_clks(fpc1020, true);
 	}
+
+         set_fingerprintd_nice(0);
 	return 0;
 }
 
