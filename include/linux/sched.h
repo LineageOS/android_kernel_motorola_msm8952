@@ -750,6 +750,7 @@ struct user_struct {
 #endif
 	unsigned long locked_shm; /* How many pages of mlocked shm ? */
 	atomic_long_t pipe_bufs;  /* how many pages are allocated in pipe buffers */
+        unsigned long unix_inflight;	/* How many files in flight in unix sockets */
 
 #ifdef CONFIG_KEYS
 	struct key *uid_keyring;	/* UID specific keyring */
@@ -3011,3 +3012,4 @@ static inline unsigned long rlimit_max(unsigned int limit)
 }
 
 #endif
+
