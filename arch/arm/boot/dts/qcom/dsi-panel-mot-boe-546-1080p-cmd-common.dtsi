@@ -73,7 +73,6 @@ qcom,mdss-dsi-dma-trigger = "trigger_sw";
 qcom,mdss-dsi-mdp-trigger = "none";
 qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
 qcom,mdss-dsi-reset-sequence = <0 11>, <1 21>;
-qcom,mdss-dsi-lp11-init;
 qcom,mdss-dsi-tx-eot-append;
 
 qcom,mdss-dsi-te-pin-select = <1>;
@@ -89,6 +88,8 @@ qcom,mdss-dsi-panel-status-value = <0x1c>;
 qcom,mdss-dsi-panel-on-check-value = <0x1c>;
 qcom,partial-update-enabled;
 qcom,panel-roi-alignment = <16 2 16 2 320 0>;
+qcom,panel-allow-phy-poweroff;
+qcom,ulps-enabled;
 
 qcom,panel-supply-entries {
 	#address-cells = <1>;
