@@ -58,15 +58,16 @@ static int32_t msm_cci_set_clk_param(struct cci_device *cci_dev,
 	enum cci_i2c_master_t master = c_ctrl->cci_info->cci_i2c_master;
 	enum i2c_freq_mode_t i2c_freq_mode = c_ctrl->cci_info->i2c_freq_mode;
 
-	clk_params = &cci_dev->cci_clk_params[i2c_freq_mode];
-
 	if ((i2c_freq_mode >= I2C_MAX_MODES) || (i2c_freq_mode < 0)) {
 		pr_err("%s:%d invalid i2c_freq_mode = %d",
 			__func__, __LINE__, i2c_freq_mode);
 		return -EINVAL;
 	}
+
 	if (cci_dev->i2c_freq_mode[master] == i2c_freq_mode)
 		return 0;
+
+	clk_params = &cci_dev->cci_clk_params[i2c_freq_mode];
 	if (MASTER_0 == master) {
 		msm_camera_io_w_mb(clk_params->hw_thigh << 16 |
 			clk_params->hw_tlow,
@@ -881,7 +882,7 @@ static int32_t msm_cci_i2c_read_bytes(struct v4l2_subdev *sd,
 	uint16_t read_bytes = 0;
 
 	if (!sd || !c_ctrl) {
-		pr_err("%s:%d sd %p c_ctrl %p\n", __func__,
+		pr_err("%s:%d sd %pK c_ctrl %pK\n", __func__,
 			__LINE__, sd, c_ctrl);
 		return -EINVAL;
 	}
@@ -1151,6 +1152,13 @@ static struct msm_cam_clk_info *msm_cci_get_clk(struct cci_device *cci_dev,
 	struct msm_cci_clk_params_t *clk_params = NULL;
 	enum i2c_freq_mode_t i2c_freq_mode = c_ctrl->cci_info->i2c_freq_mode;
 	struct device_node *of_node = cci_dev->pdev->dev.of_node;
+
+	if ((i2c_freq_mode >= I2C_MAX_MODES) || (i2c_freq_mode < 0)) {
+		pr_err("%s:%d invalid i2c_freq_mode %d\n",
+			__func__, __LINE__, i2c_freq_mode);
+		return NULL;
+	}
+
 	clk_params = &cci_dev->cci_clk_params[i2c_freq_mode];
 	cci_clk_src = clk_params->cci_clk_src;
 
@@ -1187,7 +1195,7 @@ static int32_t msm_cci_i2c_set_sync_prms(struct v4l2_subdev *sd,
 
 	cci_dev = v4l2_get_subdevdata(sd);
 	if (!cci_dev || !c_ctrl) {
-		pr_err("%s:%d failed: invalid params %p %p\n", __func__,
+		pr_err("%s:%d failed: invalid params %pK %pK\n", __func__,
 			__LINE__, cci_dev, c_ctrl);
 		rc = -EINVAL;
 		return rc;
@@ -1209,7 +1217,7 @@ static int32_t msm_cci_init(struct v4l2_subdev *sd,
 
 	cci_dev = v4l2_get_subdevdata(sd);
 	if (!cci_dev || !c_ctrl) {
-		pr_err("%s:%d failed: invalid params %p %p\n", __func__,
+		pr_err("%s:%d failed: invalid params %pK %pK\n", __func__,
 			__LINE__, cci_dev, c_ctrl);
 		rc = -EINVAL;
 		return rc;
@@ -1429,7 +1437,7 @@ static int32_t msm_cci_write(struct v4l2_subdev *sd,
 
 	cci_dev = v4l2_get_subdevdata(sd);
 	if (!cci_dev || !c_ctrl) {
-		pr_err("%s:%d failed: invalid params %p %p\n", __func__,
+		pr_err("%s:%d failed: invalid params %pK %pK\n", __func__,
 			__LINE__, cci_dev, c_ctrl);
 		rc = -EINVAL;
 		return rc;
@@ -1958,7 +1966,7 @@ static int msm_cci_probe(struct platform_device *pdev)
 {
 	struct cci_device *new_cci_dev;
 	int rc = 0, i = 0;
-	CDBG("%s: pdev %p device id = %d\n", __func__, pdev, pdev->id);
+	CDBG("%s: pdev %pK device id = %d\n", __func__, pdev, pdev->id);
 	new_cci_dev = kzalloc(sizeof(struct cci_device), GFP_KERNEL);
 	if (!new_cci_dev) {
 		CDBG("%s: no enough memory\n", __func__);
@@ -1971,7 +1979,7 @@ static int msm_cci_probe(struct platform_device *pdev)
 			ARRAY_SIZE(new_cci_dev->msm_sd.sd.name), "msm_cci");
 	v4l2_set_subdevdata(&new_cci_dev->msm_sd.sd, new_cci_dev);
 	platform_set_drvdata(pdev, &new_cci_dev->msm_sd.sd);
-	CDBG("%s sd %p\n", __func__, &new_cci_dev->msm_sd.sd);
+	CDBG("%s sd %pK\n", __func__, &new_cci_dev->msm_sd.sd);
 	if (pdev->dev.of_node)
 		of_property_read_u32((&pdev->dev)->of_node,
 			"cell-index", &pdev->id);
@@ -2042,7 +2050,7 @@ static int msm_cci_probe(struct platform_device *pdev)
 		if (!new_cci_dev->write_wq[i])
 			pr_err("Failed to create write wq\n");
 	}
-	CDBG("%s cci subdev %p\n", __func__, &new_cci_dev->msm_sd.sd);
+	CDBG("%s cci subdev %pK\n", __func__, &new_cci_dev->msm_sd.sd);
 	CDBG("%s line %d\n", __func__, __LINE__);
 	return 0;
 

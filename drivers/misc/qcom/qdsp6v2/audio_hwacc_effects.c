@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2016, The Linux Foundation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -20,7 +20,6 @@
 #include <sound/msm-dts-eagle.h>
 
 #define MAX_CHANNELS_SUPPORTED		8
-#define MAX_PP_PARAMS_SZ		128
 #define WAIT_TIMEDOUT_DURATION_SECS	1
 
 struct q6audio_effects {
@@ -100,7 +99,7 @@ static void audio_effects_event_handler(uint32_t opcode, uint32_t token,
 	struct q6audio_effects *effects;
 
 	if (!payload || !priv) {
-		pr_err("%s: invalid data to handle events, payload: %p, priv: %p\n",
+		pr_err("%s: invalid data to handle events, payload: %pK, priv: %pK\n",
 			__func__, payload, priv);
 		return;
 	}
@@ -164,7 +163,7 @@ static int audio_effects_shared_ioctl(struct file *file, unsigned cmd,
 
 		pr_debug("%s: dec buf size: %d, num_buf: %d, enc buf size: %d, num_buf: %d\n",
 			 __func__, effects->config.output.buf_size,
-			 effects->config.output.buf_size,
+			 effects->config.output.num_buf,
 			 effects->config.input.buf_size,
 			 effects->config.input.num_buf);
 		rc = q6asm_audio_client_buf_alloc_contiguous(IN, effects->ac,
@@ -252,7 +251,8 @@ static int audio_effects_shared_ioctl(struct file *file, unsigned cmd,
 
 		bufptr = q6asm_is_cpu_buf_avail(IN, effects->ac, &size, &idx);
 		if (bufptr) {
-			if (copy_from_user(bufptr, (void *)arg,
+			if ((effects->config.buf_cfg.output_len > size) ||
+				copy_from_user(bufptr, (void *)arg,
 					effects->config.buf_cfg.output_len)) {
 				rc = -EFAULT;
 				goto ioctl_fail;
@@ -308,7 +308,8 @@ static int audio_effects_shared_ioctl(struct file *file, unsigned cmd,
 				rc = -EFAULT;
 				goto ioctl_fail;
 			}
-			if (copy_to_user((void *)arg, bufptr,
+			if ((effects->config.buf_cfg.input_len > size) ||
+				copy_to_user((void *)arg, bufptr,
 					  effects->config.buf_cfg.input_len)) {
 				rc = -EFAULT;
 				goto ioctl_fail;
@@ -629,6 +630,8 @@ static long audio_effects_compat_ioctl(struct file *file, unsigned int cmd,
 	case AUDIO_EFFECTS_GET_BUF_AVAIL32: {
 		struct msm_hwacc_buf_avail32 buf_avail;
 
+		memset(&buf_avail, 0, sizeof(buf_avail));
+
 		buf_avail.input_num_avail = atomic_read(&effects->in_count);
 		buf_avail.output_num_avail = atomic_read(&effects->out_count);
 		pr_debug("%s: write buf avail: %d, read buf avail: %d\n",
@@ -702,7 +705,7 @@ static int audio_effects_release(struct inode *inode, struct file *file)
 				__func__);
 		rc = q6asm_cmd(effects->ac, CMD_CLOSE);
 		if (rc < 0)
-			pr_err("%s[%p]:Failed to close the session rc=%d\n",
+			pr_err("%s[%pK]:Failed to close the session rc=%d\n",
 				__func__, effects, rc);
 		effects->opened = 0;
 		effects->started = 0;

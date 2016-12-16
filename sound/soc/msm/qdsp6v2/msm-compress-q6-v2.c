@@ -35,6 +35,7 @@
 
 #include <sound/timer.h>
 #include <sound/tlv.h>
+#include <sound/q6core.h>
 
 #include <sound/apr_audio-v2.h>
 #include <sound/q6asm-v2.h>
@@ -213,8 +214,13 @@ static int msm_compr_set_volume(struct snd_compr_stream *cstream,
 				uint32_t volume_l, uint32_t volume_r)
 {
 	struct msm_compr_audio *prtd;
-	int rc = 0;
-	uint32_t avg_vol;
+	int i, rc = -1;
+	uint32_t avg_vol, gain_list[VOLUME_CONTROL_MAX_CHANNELS];
+	uint32_t num_channels;
+	struct snd_soc_pcm_runtime *rtd;
+	struct msm_compr_pdata *pdata;
+	bool use_default = true;
+	u8 *chmap = NULL;
 
 	pr_debug("%s: volume_l %d volume_r %d\n",
 		__func__, volume_l, volume_r);
@@ -222,18 +228,30 @@ static int msm_compr_set_volume(struct snd_compr_stream *cstream,
 		pr_err("%s: session not active\n", __func__);
 		return -EPERM;
 	}
+	rtd = cstream->private_data;
 	prtd = cstream->runtime->private_data;
 
 	if (!prtd || !prtd->audio_client) {
-		pr_err("%s: invalid session prtd or no audio client", __func__);
+		pr_err("%s: invalid session/rtd, prtd or no audio client",
+				__func__);
 		return rc;
 	}
+	pdata = snd_soc_platform_get_drvdata(rtd->platform);
 
 	if (prtd->compr_passthr != LEGACY_PCM) {
 		pr_debug("%s: No volume config for passthrough %d\n",
 			 __func__, prtd->compr_passthr);
 		return rc;
 	}
+
+	use_default = !(pdata->ch_map[rtd->dai_link->be_id]->set_ch_map);
+	chmap = pdata->ch_map[rtd->dai_link->be_id]->channel_map;
+	num_channels = prtd->num_channels;
+	pr_debug("%s: call q6asm_set_volume volume_l(%d)volume_r(%d)num of channels(%d)\n",
+	__func__, volume_l, volume_r, prtd->num_channels);
+	pr_debug("%s: AVS version(%d): 0 for AVS2.6, 1 for AVS2.7\n",
+	__func__, q6core_get_avs_version());
+
 	if (prtd->num_channels > 2) {
 		/*
 		 * Currently the left and right gains are averaged an applied
@@ -244,18 +262,51 @@ static int msm_compr_set_volume(struct snd_compr_stream *cstream,
 		 * channel gains.
 		 *
 		 */
-		pr_debug("%s: call q6asm_set_volume for multichannel\n",
-			 __func__);
-		avg_vol = (volume_l + volume_r) / 2;
-		rc = q6asm_set_volume(prtd->audio_client, avg_vol);
+		switch (q6core_get_avs_version()) {
+		case Q6_SUBSYS_AVS2_7:
+			avg_vol = (volume_l + volume_r) / 2;
+			for (i = 0; i < prtd->num_channels; i++)
+				gain_list[i] = avg_vol;
+			rc = q6asm_set_multich_gain(prtd->audio_client,
+				num_channels, gain_list, chmap, use_default);
+			break;
+		case Q6_SUBSYS_AVS2_6:
+			avg_vol = (volume_l + volume_r) / 2;
+			rc = q6asm_set_volume(prtd->audio_client, avg_vol);
+			break;
+		case Q6_SUBSYS_INVALID:
+		default:
+			pr_err("%s: UNKNOWN AVS IMAGE\n", __func__);
+			return rc;
+		}
 	} else {
-		pr_debug("%s: call q6asm_set_lrgain\n", __func__);
-		rc = q6asm_set_lrgain(prtd->audio_client, volume_l, volume_r);
-		if (rc < 0)
-			pr_err("%s: Send LR gain command failed rc=%d\n",
-				__func__, rc);
+		switch (q6core_get_avs_version()) {
+		case Q6_SUBSYS_AVS2_7:
+			gain_list[0] = volume_l;
+			gain_list[1] = volume_r;
+			/* force sending FR/FL/FC volume for mono */
+			if (prtd->num_channels == 1) {
+				gain_list[2] = volume_l;
+				num_channels = 3;
+				use_default = true;
+			}
+			rc = q6asm_set_multich_gain(prtd->audio_client,
+				num_channels, gain_list, chmap, use_default);
+			break;
+		case Q6_SUBSYS_AVS2_6:
+			pr_debug("%s: call q6asm_set_lrgain\n", __func__);
+			rc = q6asm_set_lrgain(prtd->audio_client,
+						volume_l, volume_r);
+			if (rc < 0)
+				pr_err("%s: Send LR gain command failed rc=%d\n",
+					__func__, rc);
+			break;
+		case Q6_SUBSYS_INVALID:
+		default:
+			pr_err("%s: UNKNOWN AVS IMAGE\n", __func__);
+			return rc;
+		}
 	}
-
 	if (rc < 0)
 		pr_err("%s: Send vol gain command failed rc=%d\n",
 		       __func__, rc);
@@ -655,9 +706,10 @@ static int msm_compr_send_media_format_block(struct snd_compr_stream *cstream,
 	union snd_codec_options *codec_options;
 
 	int ret = 0;
-	uint16_t bit_width = 16;
+	uint16_t bit_width;
 	bool use_default_chmap = true;
 	char *chmap = NULL;
+	uint16_t sample_word_size;
 
 	pr_debug("%s: use_gapless_codec_options %d\n",
 			__func__, use_gapless_codec_options);
@@ -681,15 +733,30 @@ static int msm_compr_send_media_format_block(struct snd_compr_stream *cstream,
 			chmap =
 			    pdata->ch_map[rtd->dai_link->be_id]->channel_map;
 		}
-		if (prtd->codec_param.codec.format == SNDRV_PCM_FORMAT_S24_LE)
+
+		switch (prtd->codec_param.codec.format) {
+		case SNDRV_PCM_FORMAT_S24_LE:
 			bit_width = 24;
-		ret = q6asm_media_format_block_pcm_format_support_v2(
+			sample_word_size = 32;
+			break;
+		case SNDRV_PCM_FORMAT_S24_3LE:
+			bit_width = 24;
+			sample_word_size = 24;
+			break;
+		case SNDRV_PCM_FORMAT_S16_LE:
+		default:
+			bit_width = 16;
+			sample_word_size = 16;
+			break;
+		}
+		ret = q6asm_media_format_block_pcm_format_support_v3(
 							prtd->audio_client,
 							prtd->sample_rate,
 							prtd->num_channels,
 							bit_width, stream_id,
 							use_default_chmap,
-							chmap);
+							chmap,
+							sample_word_size);
 		if (ret < 0)
 			pr_err("%s: CMD Format block failed\n", __func__);
 
@@ -916,7 +983,8 @@ static int msm_compr_configure_dsp(struct snd_compr_stream *cstream)
 	};
 
 	pr_debug("%s: stream_id %d\n", __func__, ac->stream_id);
-	if (prtd->codec_param.codec.format == SNDRV_PCM_FORMAT_S24_LE)
+	if ((prtd->codec_param.codec.format == SNDRV_PCM_FORMAT_S24_LE) ||
+        	(prtd->codec_param.codec.format == SNDRV_PCM_FORMAT_S24_3LE))
 		bits_per_sample = 24;
 	else if (prtd->codec_param.codec.format == SNDRV_PCM_FORMAT_S32_LE)
 		bits_per_sample = 32;
@@ -943,7 +1011,7 @@ static int msm_compr_configure_dsp(struct snd_compr_stream *cstream)
 	} else {
 		pr_debug("%s: stream_id %d bits_per_sample %d\n",
 				__func__, ac->stream_id, bits_per_sample);
-		ret = q6asm_stream_open_write_v2(ac,
+		ret = q6asm_stream_open_write_v3(ac,
 				prtd->codec, bits_per_sample,
 				ac->stream_id,
 				prtd->gapless_state.use_dsp_gapless_mode);
@@ -1748,9 +1816,29 @@ static int msm_compr_trigger(struct snd_compr_stream *cstream, int cmd)
 			/*
 			 * Cache this time as last known time
 			 */
-			q6asm_get_session_time(prtd->audio_client,
+			switch (q6core_get_avs_version()) {
+			case (Q6_SUBSYS_AVS2_7):
+			{
+				q6asm_get_session_time(prtd->audio_client,
 					       &prtd->marker_timestamp);
+				break;
+			}
+			case (Q6_SUBSYS_AVS2_6):
+			{
+				q6asm_get_session_time_legacy(
+				prtd->audio_client, &prtd->marker_timestamp);
+				break;
+			}
+			case (Q6_SUBSYS_INVALID):
+			default:
+			{
+				pr_err("%s: UNKNOWN AVS IMAGE VERSION\n",
+							__func__);
+				break;
+			}
+			}
 			spin_lock_irqsave(&prtd->lock, flags);
+
 			/*
 			 * Don't reset these as these vars map to
 			 * total_bytes_transferred and total_bytes_available.
@@ -1845,7 +1933,7 @@ static int msm_compr_trigger(struct snd_compr_stream *cstream, int cmd)
 
 		pr_debug("%s: open_write stream_id %d bits_per_sample %d",
 				__func__, stream_id, bits_per_sample);
-		rc = q6asm_stream_open_write_v2(prtd->audio_client,
+		rc = q6asm_stream_open_write_v3(prtd->audio_client,
 				prtd->codec, bits_per_sample,
 				stream_id,
 				prtd->gapless_state.use_dsp_gapless_mode);
@@ -1919,7 +2007,27 @@ static int msm_compr_pointer(struct snd_compr_stream *cstream,
 			pr_debug("%s session time in gapless transition",
 				 __func__);
 
-		rc = q6asm_get_session_time(prtd->audio_client, &timestamp);
+		switch (q6core_get_avs_version()) {
+		case (Q6_SUBSYS_AVS2_7):
+		{
+			rc = q6asm_get_session_time(prtd->audio_client,
+				       &timestamp);
+			break;
+		}
+		case (Q6_SUBSYS_AVS2_6):
+		{
+			rc = q6asm_get_session_time_legacy(
+					prtd->audio_client, &timestamp);
+			break;
+		}
+		case (Q6_SUBSYS_INVALID):
+		default:
+		{
+			pr_err("%s: UNKNOWN AVS IMAGE VERSION\n", __func__);
+			rc = -EINVAL;
+			break;
+		}
+		}
 		if (rc < 0) {
 			pr_err("%s: Get Session Time return value =%lld\n",
 				__func__, timestamp);
@@ -2064,7 +2172,7 @@ static int msm_compr_get_caps(struct snd_compr_stream *cstream,
 		memcpy(arg, &prtd->compr_cap, sizeof(struct snd_compr_caps));
 	} else {
 		ret = -EINVAL;
-		pr_err("%s: arg (0x%p), prtd (0x%p)\n", __func__, arg, prtd);
+		pr_err("%s: arg (0x%pK), prtd (0x%pK)\n", __func__, arg, prtd);
 	}
 
 	return ret;
@@ -2780,7 +2888,7 @@ static int msm_compr_audio_effects_config_info(struct snd_kcontrol *kcontrol,
 					       struct snd_ctl_elem_info *uinfo)
 {
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
-	uinfo->count = 128;
+	uinfo->count = MAX_PP_PARAMS_SZ;
 	uinfo->value.integer.min = 0;
 	uinfo->value.integer.max = 0xFFFFFFFF;
 	return 0;

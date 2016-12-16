@@ -151,6 +151,7 @@ static void arm_dma_unremap(struct device *dev, void *remapped_addr,
 	unsigned int flags = VM_ARM_DMA_CONSISTENT | VM_USERMAP;
 	struct vm_struct *area;
 
+	size = PAGE_ALIGN(size);
 	remapped_addr = (void *)((unsigned long)remapped_addr & PAGE_MASK);
 
 	area = find_vm_area(remapped_addr);
@@ -1484,11 +1485,18 @@ static int arm_iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
 	unsigned long uaddr = vma->vm_start;
 	unsigned long usize = vma->vm_end - vma->vm_start;
 	struct page **pages = __iommu_get_pages(cpu_addr, attrs);
+	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
+	unsigned long off = vma->vm_pgoff;
 
 	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot);
 
 	if (!pages)
 		return -ENXIO;
+
+	if (off >= nr_pages || (usize >> PAGE_SHIFT) > nr_pages - off)
+		return -ENXIO;
+
+	pages += off;
 
 	do {
 		int ret = vm_insert_page(vma, uaddr, *pages++);

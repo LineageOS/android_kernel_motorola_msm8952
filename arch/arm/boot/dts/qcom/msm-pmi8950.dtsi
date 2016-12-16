@@ -528,7 +528,7 @@
 			label = "flash";
 			qcom,headroom = <500>;
 			qcom,startup-dly = <128>;
-			qcom,clamp-curr = <200>;
+			qcom,clamp-current = <75>;
 			qcom,pmic-charger-support;
 			qcom,self-check-enabled;
 			qcom,thermal-derate-enabled;
@@ -538,7 +538,7 @@
 			qcom,ramp_up_step = "6P7_US";
 			qcom,ramp_dn_step = "6P7_US";
 			qcom,vph-pwr-droop-enabled;
-			qcom,vph-pwr-droop-threshold = <3200>;
+			qcom,vph-pwr-droop-threshold = <3000>;
 			qcom,vph-pwr-droop-debounce-time = <10>;
 			qcom,headroom-sense-ch0-enabled;
 			qcom,headroom-sense-ch1-enabled;
@@ -594,6 +594,9 @@
 				qcom,duration = <150>;
 				qcom,id = <2>;
 				qcom,current = <1000>;
+				reg0 {
+					regulator-name = "pon_spare_reg";
+				};
 			};
 		};
 
@@ -618,6 +621,7 @@
 			qcom,wave-samples = [3e 3e 3e 3e 3e 3e 3e 3e];
 			qcom,wave-rep-cnt = <1>;
 			qcom,wave-samp-rep-cnt = <1>;
+			mmi,vib-boot-up-vib-ms = <250>;
 		};
 	};
 };

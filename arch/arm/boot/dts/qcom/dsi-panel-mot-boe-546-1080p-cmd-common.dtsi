@@ -38,36 +38,19 @@ qcom,mdss-dsi-v-bottom-border = <0>;
 qcom,mdss-dsi-bpp = <24>;
 qcom,mdss-dsi-underflow-color = <0xff>;
 qcom,mdss-dsi-border-color = <0>;
-qcom,mdss-dsi-on-command = [
-	05 01 00 00 78 00 01 11
-	/* MCS Protect */
-	23 01 00 00 00 00 02 B0 00
-	/* CABC RGB full PWM */
-	29 01 00 00 00 00 02 FA 20
-	/* CABC PWM setting */
-	29 01 00 00 00 00 18 CE 5D 40 43 49 55 62 71 82 94 A8 B9 CB DB E9 FE FE FF 03 15 04 04 00 00
-	/* CABC UI mode setting */
-	29 01 00 00 00 00 07 B8 07 8B 19 08 0C 21
-	/* CABC Moving Image mode setting */
-	29 01 00 00 00 00 07 BA 07 7A 64 18 30 8D
-	/* Set Max Brightness */
-	15 01 00 00 00 00 02 51 CC
-	/* Set Minimum Brightness */
-	15 01 00 00 00 00 02 5E 00
-	/* BLU control */
-	15 01 00 00 00 00 02 53 2C
-	/* set defaut CABC to UI mode */
-	15 01 00 00 00 00 02 55 01
-	05 01 00 00 00 00 01 29];
-qcom,mdss-dsi-off-command = [
-	05 01 00 00 0a 00 01 28
-	05 01 00 00 55 00 01 10];
-
+qcom,mdss-dsi-on-command = [05 01 00 00 78 00 01 11 23 00 00 00 00 00 02 b0 00 29 00 00 00 00 00 02 fa 20 29 00 00 00 00 00 18 ce 5d 40 43 49 55 62 71 82 94 a8 b9 cb db e9 fe fe ff 03 15 04 04 00 00 29 00 00 00 00 00 07 b8 07 8b 19 08 0c 21 29 00 00 00 00 00 07 ba 07 7a 64 18 30 8d 15 00 00 00 00 00 02 51 cc 15 00 00 00 00 00 02 5e 00 15 00 00 00 00 00 02 53 2c 15 00 00 00 00 00 02 55 01 05 01 00 00 00 00 01 29];
+qcom,mdss-dsi-off-command = <0x5010000 0xa000128 0x5010000 0x55000110>;
 qcom,mdss-dsi-cabc-ui-command = [15 01 00 00 00 00 02 55 01];
+qcom,mdss-dsi-cabc-ui-command-state = "dsi_hs_mode";
 qcom,mdss-dsi-cabc-mv-command = [15 01 00 00 00 00 02 55 03];
+qcom,mdss-dsi-cabc-mv-command-state = "dsi_hs_mode";
 qcom,mdss-dsi-cabc-dis-command = [15 01 00 00 00 00 02 55 00];
-qcom,mdss-dsi-hbm-on-command = [15 01 00 00 00 00 02 51 FF];
-qcom,mdss-dsi-hbm-off-command = [15 01 00 00 00 00 02 51 CC];
+qcom,mdss-dsi-cabc-dis-command-state = "dsi_hs_mode";
+qcom,mdss-dsi-hbm-on-command = [15 01 00 00 00 00 02 51 ff];
+qcom,mdss-dsi-hbm-on-command-state = "dsi_hs_mode";
+qcom,mdss-dsi-hbm-off-command = [15 01 00 00 00 00 02 51 cc];
+qcom,mdss-dsi-hbm-off-command-state = "dsi_hs_mode";
+qcom,mdss-dsi-hbm-type = "lcd-dcs-wled";
 
 qcom,mdss-dsi-use-blank-in-progress-notifier;
 qcom,mdss-dsi-on-command-state = "dsi_lp_mode";
@@ -90,7 +73,6 @@ qcom,mdss-dsi-dma-trigger = "trigger_sw";
 qcom,mdss-dsi-mdp-trigger = "none";
 qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
 qcom,mdss-dsi-reset-sequence = <0 11>, <1 21>;
-qcom,mdss-dsi-lp11-init;
 qcom,mdss-dsi-tx-eot-append;
 
 qcom,mdss-dsi-te-pin-select = <1>;
@@ -106,6 +88,8 @@ qcom,mdss-dsi-panel-status-value = <0x1c>;
 qcom,mdss-dsi-panel-on-check-value = <0x1c>;
 qcom,partial-update-enabled;
 qcom,panel-roi-alignment = <16 2 16 2 320 0>;
+qcom,panel-allow-phy-poweroff;
+qcom,ulps-enabled;
 
 qcom,panel-supply-entries {
 	#address-cells = <1>;

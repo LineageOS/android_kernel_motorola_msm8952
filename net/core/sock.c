@@ -419,8 +419,6 @@ static void sock_warn_obsolete_bsdism(const char *name)
 	}
 }
 
-#define SK_FLAGS_TIMESTAMP ((1UL << SOCK_TIMESTAMP) | (1UL << SOCK_TIMESTAMPING_RX_SOFTWARE))
-
 static void sock_disable_timestamp(struct sock *sk, unsigned long flags)
 {
 	if (sk->sk_flags & flags) {
@@ -1749,23 +1747,24 @@ static long sock_wait_for_wmem(struct sock *sk, long timeo)
 
 struct sk_buff *sock_alloc_send_pskb(struct sock *sk, unsigned long header_len,
 				     unsigned long data_len, int noblock,
-				     int *errcode, int max_page_order)
+				     int *errcode)
 {
-	struct sk_buff *skb = NULL;
-	unsigned long chunk;
+	struct sk_buff *skb;
 	gfp_t gfp_mask;
 	long timeo;
 	int err;
 	int npages = (data_len + (PAGE_SIZE - 1)) >> PAGE_SHIFT;
-	struct page *page;
-	int i;
 
 	err = -EMSGSIZE;
 	if (npages > MAX_SKB_FRAGS)
 		goto failure;
 
+	gfp_mask = sk->sk_allocation;
+	if (gfp_mask & __GFP_WAIT)
+		gfp_mask |= __GFP_REPEAT;
+
 	timeo = sock_sndtimeo(sk, noblock);
-	while (!skb) {
+	while (1) {
 		err = sock_error(sk);
 		if (err != 0)
 			goto failure;
@@ -1774,55 +1773,50 @@ struct sk_buff *sock_alloc_send_pskb(struct sock *sk, unsigned long header_len,
 		if (sk->sk_shutdown & SEND_SHUTDOWN)
 			goto failure;
 
-		if (atomic_read(&sk->sk_wmem_alloc) >= sk->sk_sndbuf) {
-			set_bit(SOCK_ASYNC_NOSPACE, &sk->sk_socket->flags);
-			set_bit(SOCK_NOSPACE, &sk->sk_socket->flags);
-			err = -EAGAIN;
-			if (!timeo)
-				goto failure;
-			if (signal_pending(current))
-				goto interrupted;
-			timeo = sock_wait_for_wmem(sk, timeo);
-			continue;
-		}
+		if (atomic_read(&sk->sk_wmem_alloc) < sk->sk_sndbuf) {
+			skb = alloc_skb(header_len, gfp_mask);
+			if (skb) {
+				int i;
 
-		err = -ENOBUFS;
-		gfp_mask = sk->sk_allocation;
-		if (gfp_mask & __GFP_WAIT)
-			gfp_mask |= __GFP_REPEAT;
+				/* No pages, we're done... */
+				if (!data_len)
+					break;
 
-		skb = alloc_skb(header_len, gfp_mask);
-		if (!skb)
-			goto failure;
+				skb->truesize += data_len;
+				skb_shinfo(skb)->nr_frags = npages;
+				for (i = 0; i < npages; i++) {
+					struct page *page;
 
-		skb->truesize += data_len;
+					page = alloc_pages(sk->sk_allocation, 0);
+					if (!page) {
+						err = -ENOBUFS;
+						skb_shinfo(skb)->nr_frags = i;
+						kfree_skb(skb);
+						goto failure;
+					}
 
-		for (i = 0; npages > 0; i++) {
-			int order = max_page_order;
-
-			while (order) {
-				if (npages >= 1 << order) {
-					page = alloc_pages(sk->sk_allocation |
-							   __GFP_COMP | __GFP_NOWARN,
-							   order);
-					if (page)
-						goto fill_page;
-					/* Do not retry other high order allocations */
-					order = 1;
-					max_page_order = 0;
+					__skb_fill_page_desc(skb, i,
+							page, 0,
+							(data_len >= PAGE_SIZE ?
+							 PAGE_SIZE :
+							 data_len));
+					data_len -= PAGE_SIZE;
 				}
-				order--;
+
+				/* Full success... */
+				break;
 			}
-			page = alloc_page(sk->sk_allocation);
-			if (!page)
-				goto failure;
-fill_page:
-			chunk = min_t(unsigned long, data_len,
-				      PAGE_SIZE << order);
-			skb_fill_page_desc(skb, i, page, 0, chunk);
-			data_len -= chunk;
-			npages -= 1 << order;
+			err = -ENOBUFS;
+			goto failure;
 		}
+		set_bit(SOCK_ASYNC_NOSPACE, &sk->sk_socket->flags);
+		set_bit(SOCK_NOSPACE, &sk->sk_socket->flags);
+		err = -EAGAIN;
+		if (!timeo)
+			goto failure;
+		if (signal_pending(current))
+			goto interrupted;
+		timeo = sock_wait_for_wmem(sk, timeo);
 	}
 
 	skb_set_owner_w(skb, sk);
@@ -1831,7 +1825,6 @@ fill_page:
 interrupted:
 	err = sock_intr_errno(timeo);
 failure:
-	kfree_skb(skb);
 	*errcode = err;
 	return NULL;
 }
@@ -1840,7 +1833,7 @@ EXPORT_SYMBOL(sock_alloc_send_pskb);
 struct sk_buff *sock_alloc_send_skb(struct sock *sk, unsigned long size,
 				    int noblock, int *errcode)
 {
-	return sock_alloc_send_pskb(sk, size, 0, noblock, errcode, 0);
+	return sock_alloc_send_pskb(sk, size, 0, noblock, errcode);
 }
 EXPORT_SYMBOL(sock_alloc_send_skb);
 

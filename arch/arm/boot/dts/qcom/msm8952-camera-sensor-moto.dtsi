@@ -382,6 +382,28 @@
 			};
 		};
 
+		cam_sensor_rear_vaf_default {
+			qcom,pins = <&gp 6>;
+			qcom,num-grp-pins = <1>;
+			label = "cam_sensor_rear_vaf_default";
+
+			cam_sensor_rear_vaf_default {
+				drive-strength = <2>;
+				bias-disable;
+			};
+		};
+
+		cam_sensor_rear_vaf_sleep {
+			qcom,pins = <&gp 6>;
+			qcom,num-grp-pins = <0x1>;
+			label = "cam_sensor_rear_vaf_sleep";
+
+			cam_sensor_rear_vaf_sleep {
+				drive-strength = <2>;
+				bias-disable;
+			};
+		};
+
 		cam_sensor_front1_default {
 			/* RESET */
 			qcom,pins = <&gp 40>;

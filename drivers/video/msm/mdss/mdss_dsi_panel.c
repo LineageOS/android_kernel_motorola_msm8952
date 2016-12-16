@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -29,11 +29,15 @@
 
 #include "mdss_dsi.h"
 #include "mdss_dba_utils.h"
+
 #include "mdss_dropbox.h"
 #include "mdss_fb.h"
 
 #define MDSS_PANEL_DEFAULT_VER 0xffffffffffffffff
 #define MDSS_PANEL_UNKNOWN_NAME "unknown"
+
+#include "mdss_livedisplay.h"
+
 #define DT_CMD_HDR 6
 #define MIN_REFRESH_RATE 48
 #define DEFAULT_MDP_TRANSFER_TIME 14000
@@ -197,7 +201,7 @@ u32 mdss_dsi_panel_cmd_read(struct mdss_dsi_ctrl_pdata *ctrl, char cmd0,
 	return 0;
 }
 
-static void mdss_dsi_panel_cmds_send(struct mdss_dsi_ctrl_pdata *ctrl,
+void mdss_dsi_panel_cmds_send(struct mdss_dsi_ctrl_pdata *ctrl,
 			struct dsi_panel_cmds *pcmds)
 {
 	struct dcs_cmd_req cmdreq;
@@ -868,8 +872,7 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 	ctrl = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
 
-	pr_debug("%s: ctrl=%p ndx=%d\n", __func__, ctrl, ctrl->ndx);
-	pr_info("%s[%d]+.\n", __func__, ctrl->ndx);
+	pr_debug("%s: ctrl=%pK ndx=%d\n", __func__, ctrl, ctrl->ndx);
 
 	if (pinfo->dcs_cmd_by_left) {
 		if (ctrl->ndx != DSI_CTRL_LEFT)
@@ -887,7 +890,7 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 			(pinfo->mipi.boot_mode != pinfo->mipi.mode))
 		on_cmds = &ctrl->post_dms_on_cmds;
 
-	pr_debug("%s: ctrl=%p cmd_cnt=%d\n", __func__, ctrl, on_cmds->cmd_cnt);
+	pr_debug("%s: ctrl=%pK cmd_cnt=%d\n", __func__, ctrl, on_cmds->cmd_cnt);
 
 	if (on_cmds->cmd_cnt)
 		mdss_dsi_panel_cmds_send(ctrl, on_cmds);
@@ -946,7 +949,7 @@ static int mdss_dsi_post_panel_on(struct mdss_panel_data *pdata)
 	ctrl = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
 
-	pr_debug("%s: ctrl=%p ndx=%d\n", __func__, ctrl, ctrl->ndx);
+	pr_debug("%s: ctrl=%pK ndx=%d\n", __func__, ctrl, ctrl->ndx);
 
 	pinfo = &pdata->panel_info;
 	if (pinfo->dcs_cmd_by_left) {
@@ -956,7 +959,7 @@ static int mdss_dsi_post_panel_on(struct mdss_panel_data *pdata)
 
 	on_cmds = &ctrl->post_panel_on_cmds;
 
-	pr_debug("%s: ctrl=%p cmd_cnt=%d\n", __func__, ctrl, on_cmds->cmd_cnt);
+	pr_debug("%s: ctrl=%pK cmd_cnt=%d\n", __func__, ctrl, on_cmds->cmd_cnt);
 
 	if (on_cmds->cmd_cnt) {
 		msleep(50);	/* wait for 3 vsync passed */
@@ -1006,8 +1009,7 @@ static int mdss_dsi_panel_off(struct mdss_panel_data *pdata)
 	ctrl = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
 
-	pr_debug("%s: ctrl=%p ndx=%d\n", __func__, ctrl, ctrl->ndx);
-	pr_info("%s[%d]+.\n", __func__, ctrl->ndx);
+	pr_debug("%s: ctrl=%pK ndx=%d\n", __func__, ctrl, ctrl->ndx);
 
 	if (pinfo->dcs_cmd_by_left) {
 		if (ctrl->ndx != DSI_CTRL_LEFT)
@@ -1044,7 +1046,7 @@ static int mdss_dsi_panel_low_power_config(struct mdss_panel_data *pdata,
 	ctrl = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
 
-	pr_debug("%s: ctrl=%p ndx=%d enable=%d\n", __func__, ctrl, ctrl->ndx,
+	pr_debug("%s: ctrl=%pK ndx=%d enable=%d\n", __func__, ctrl, ctrl->ndx,
 		enable);
 
 	/* Any panel specific low power commands/config */
@@ -1073,7 +1075,7 @@ static void mdss_dsi_parse_trigger(struct device_node *np, char *trigger,
 }
 
 
-static int mdss_dsi_parse_dcs_cmds(struct device_node *np,
+int mdss_dsi_parse_dcs_cmds(struct device_node *np,
 		struct dsi_panel_cmds *pcmds, char *cmd_key, char *link_key)
 {
 	const char *data;
@@ -2491,6 +2493,8 @@ static int mdss_panel_parse_dt(struct device_node *np,
 
 	if (mdss_panel_parse_param_prop(np, pinfo, ctrl_pdata))
 		pr_err("Error parsing panel parameter properties\n");
+
+	mdss_livedisplay_parse_dt(np, pinfo);
 
 	return 0;
 

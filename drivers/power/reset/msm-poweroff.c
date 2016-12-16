@@ -235,7 +235,10 @@ static void msm_restart_prepare(const char *cmd)
 			((cmd != NULL && cmd[0] != '\0') &&
 			strcmp(cmd, "recovery") &&
 			strcmp(cmd, "bootloader") &&
-			strcmp(cmd, "rtc")))
+			strcmp(cmd, "rtc") &&
+			strcmp(cmd, "dm-verity device corrupted") &&
+			strcmp(cmd, "dm-verity enforcing") &&
+			strcmp(cmd, "keys clear")))
 			need_warm_reset = true;
 	} else {
 		need_warm_reset = (get_dload_mode() ||

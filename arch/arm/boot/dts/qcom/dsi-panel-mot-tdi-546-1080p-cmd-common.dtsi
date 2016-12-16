@@ -37,42 +37,20 @@ qcom,mdss-dsi-v-bottom-border = <0>;
 qcom,mdss-dsi-bpp = <24>;
 qcom,mdss-dsi-underflow-color = <0xff>;
 qcom,mdss-dsi-border-color = <0>;
-qcom,mdss-dsi-on-command = [
-	15 01 00 00 00 00 02 FF 26 /* Touch improvements start */
-	15 01 00 00 00 00 02 31 30
-	15 01 00 00 00 00 02 52 30
-	15 01 00 00 00 00 02 6c 30
-	15 01 00 00 00 00 02 82 30
-	15 01 00 00 00 00 02 FB 01
-	15 01 00 00 00 00 02 FF 10 /* Touch improvements end */
-	15 01 00 00 00 00 02 FF 23 /* CABC config start */
-	15 01 00 00 00 00 02 13 FF
-	15 01 00 00 00 00 02 14 F5
-	15 01 00 00 00 00 02 15 ED
-	15 01 00 00 00 00 02 16 E5
-	15 01 00 00 00 00 02 FB 01
-	15 01 00 00 00 00 02 39 95
-	15 01 00 00 00 00 02 07 00
-	15 01 00 00 00 00 02 08 02
-	15 01 00 00 00 00 02 46 B8
-	15 01 00 00 00 00 02 FF 10 /* CABC config end */
-	05 01 00 00 64 00 01 11
-	15 01 00 00 00 00 02 36 03
-	39 01 00 00 00 00 03 44 07 08
-	15 01 00 00 00 00 02 35 00
-	15 01 00 00 00 00 02 51 CC
-	15 01 00 00 00 00 02 53 2C
-	15 01 00 00 00 00 02 55 01
-	05 01 00 00 00 00 01 29];	/* display on */
-qcom,mdss-dsi-off-command = [
-	05 01 00 00 0a 00 01 28		/* display_off */
-	05 01 00 00 78 00 01 10];	/* enter sleep mode */
 
+qcom,mdss-dsi-on-command = [15 00 00 00 00 00 02 ff 26 15 00 00 00 00 00 02 31 30 15 00 00 00 00 00 02 52 30 15 00 00 00 00 00 02 6c 30 15 00 00 00 00 00 02 82 30 15 00 00 00 00 00 02 fb 01 15 00 00 00 00 00 02 ff 10 15 00 00 00 00 00 02 ff 23 15 00 00 00 00 00 02 13 ff 15 00 00 00 00 00 02 14 f5 15 00 00 00 00 00 02 15 ed 15 00 00 00 00 00 02 16 e5 15 00 00 00 00 00 02 fb 01 15 00 00 00 00 00 02 39 95 15 00 00 00 00 00 02 07 00 15 00 00 00 00 00 02 08 02 15 00 00 00 00 00 02 46 b8 15 00 00 00 00 00 02 ff 10 05 01 00 00 64 00 01 11 15 00 00 00 00 00 02 36 03 39 00 00 00 00 00 03 44 07 08 15 00 00 00 00 00 02 35 00 15 00 00 00 00 00 02 51 cc 15 00 00 00 00 00 02 53 2c 15 00 00 00 00 00 02 55 01 05 01 00 00 00 00 01 29];
+qcom,mdss-dsi-off-command = <0x5010000 0xa000128 0x5010000 0x78000110>;
 qcom,mdss-dsi-cabc-ui-command = [15 01 00 00 00 00 02 55 01];
+qcom,mdss-dsi-cabc-ui-command-state = "dsi_hs_mode";
 qcom,mdss-dsi-cabc-mv-command = [15 01 00 00 00 00 02 55 03];
+qcom,mdss-dsi-cabc-mv-command-state = "dsi_hs_mode";
 qcom,mdss-dsi-cabc-dis-command = [15 01 00 00 00 00 02 55 00];
-qcom,mdss-dsi-hbm-on-command = [15 01 00 00 00 00 02 51 FF];
-qcom,mdss-dsi-hbm-off-command = [15 01 00 00 00 00 02 51 CC];
+qcom,mdss-dsi-cabc-dis-command-state = "dsi_hs_mode";
+qcom,mdss-dsi-hbm-on-command = [15 01 00 00 00 00 02 51 ff];
+qcom,mdss-dsi-hbm-on-command-state = "dsi_hs_mode";
+qcom,mdss-dsi-hbm-off-command = [15 01 00 00 00 00 02 51 cc];
+qcom,mdss-dsi-hbm-off-command-state = "dsi_hs_mode";
+qcom,mdss-dsi-hbm-type = "lcd-dcs-wled";
 
 qcom,mdss-dsi-on-command-state = "dsi_lp_mode";
 qcom,mdss-dsi-off-command-state = "dsi_lp_mode";
@@ -94,7 +72,6 @@ qcom,mdss-dsi-dma-trigger = "trigger_sw";
 qcom,mdss-dsi-mdp-trigger = "none";
 qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
 qcom,mdss-dsi-reset-sequence = <0 11>, <1 11>, <0 1>, <1 11>;
-qcom,mdss-dsi-lp11-init;
 qcom,mdss-dsi-tx-eot-append;
 
 qcom,mdss-dsi-te-pin-select = <1>;
@@ -107,6 +84,8 @@ qcom,mdss-dsi-panel-status-check-mode = "reg_read";
 qcom,mdss-dsi-panel-status-command = [06 01 00 01 00 00 01 0A];
 qcom,mdss-dsi-panel-status-command-state = "dsi_hs_mode";
 qcom,mdss-dsi-panel-status-value = <0x9c>;
+qcom,panel-allow-phy-poweroff;
+qcom,ulps-enabled;
 
 qcom,panel-supply-entries {
 	#address-cells = <1>;

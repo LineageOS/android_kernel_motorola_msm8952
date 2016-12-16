@@ -1755,6 +1755,9 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,
 	if (skb->ip_summed == CHECKSUM_PARTIAL)
 		status |= TP_STATUS_CSUMNOTREADY;
 
+	if (skb->ip_summed == CHECKSUM_UNNECESSARY)
+		status |= TP_STATUS_CSUM_UNNECESSARY;
+
 	snaplen = skb->len;
 
 	res = run_filter(skb, sk, snaplen);
@@ -2204,7 +2207,7 @@ static struct sk_buff *packet_alloc_skb(struct sock *sk, size_t prepad,
 		linear = len;
 
 	skb = sock_alloc_send_pskb(sk, prepad + linear, len - linear, noblock,
-				   err, 0);
+				   err);
 	if (!skb)
 		return NULL;
 
@@ -2997,6 +3000,7 @@ static int packet_mc_add(struct sock *sk, struct packet_mreq_max *mreq)
 	i->ifindex = mreq->mr_ifindex;
 	i->alen = mreq->mr_alen;
 	memcpy(i->addr, mreq->mr_address, i->alen);
+	memset(i->addr + i->alen, 0, sizeof(i->addr) - i->alen);
 	i->count = 1;
 	i->next = po->mclist;
 	po->mclist = i;

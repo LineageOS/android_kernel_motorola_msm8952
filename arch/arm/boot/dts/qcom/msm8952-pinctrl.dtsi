@@ -92,6 +92,25 @@
 			};
 		};
 
+		ext-spk-pa {
+			qcom,pins = <&gp 68>, <&gp 2>;
+			qcom,num-grp-pins = <2>;
+			qcom,pin-func = <0>;
+			drive-strength = <2>;
+			label = "ext-spk-pa";
+
+			pa_active {
+				output-high;
+				bias-pull-high;
+			};
+
+			pa_suspend {
+				bias-pull-down;
+				output-low;
+			};
+		};
+
+
 		pmx-uartconsole {
 			qcom,pins = <&gp 4>, <&gp 5>;
 			qcom,num-grp-pins = <2>;

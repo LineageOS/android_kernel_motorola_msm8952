@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -51,6 +51,8 @@
 
 #define BUF_POOL_SIZE 32
 #define PIPE_CLEANUP_TIMEOUT_US 100000
+#define MAX_CURSOR_IMG_WIDTH 512
+#define MAX_CURSOR_IMG_HEIGHT 512
 
 static int mdss_mdp_overlay_free_fb_pipe(struct msm_fb_data_type *mfd);
 static int mdss_mdp_overlay_fb_parse_dt(struct msm_fb_data_type *mfd);
@@ -1224,7 +1226,7 @@ struct mdss_mdp_data *__mdp_overlay_buf_alloc(struct msm_fb_data_type *mfd,
 	list_move_tail(&buf->buf_list, &mdp5_data->bufs_used);
 	list_add_tail(&buf->pipe_list, &pipe->buf_queue);
 
-	pr_debug("buffer alloc: %p\n", buf);
+	pr_debug("buffer alloc: %pK\n", buf);
 
 	return buf;
 }
@@ -1277,7 +1279,7 @@ static void __mdp_overlay_buf_free(struct msm_fb_data_type *mfd,
 	buf->last_freed = local_clock();
 	buf->state = MDP_BUF_STATE_UNUSED;
 
-	pr_debug("buffer freed: %p\n", buf);
+	pr_debug("buffer freed: %pK\n", buf);
 
 	list_move_tail(&buf->buf_list, &mdp5_data->bufs_pool);
 }
@@ -1601,7 +1603,7 @@ static int __overlay_queue_pipes(struct msm_fb_data_type *mfd)
 		if (buf) {
 			switch (buf->state) {
 			case MDP_BUF_STATE_READY:
-				pr_debug("pnum=%d buf=%p first buffer ready\n",
+				pr_debug("pnum=%d buf=%pK first buffer ready\n",
 						pipe->num, buf);
 				break;
 			case MDP_BUF_STATE_ACTIVE:
@@ -1621,7 +1623,7 @@ static int __overlay_queue_pipes(struct msm_fb_data_type *mfd)
 				}
 				break;
 			default:
-				pr_err("invalid state of buf %p=%d\n",
+				pr_err("invalid state of buf %pK=%d\n",
 						buf, buf->state);
 				BUG();
 				break;
@@ -2081,6 +2083,16 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd,
 
 	if (IS_ERR_VALUE(ret))
 		goto commit_fail;
+
+	if (mdp5_data->ctl->is_video_mode) {
+		mutex_lock(&mdp5_data->ov_lock);
+		ret = mdss_mdp_display_commit_pp_post_vsync(mdp5_data->ctl,
+			NULL, NULL);
+		mutex_unlock(&mdp5_data->ov_lock);
+
+		if (IS_ERR_VALUE(ret))
+			goto commit_fail;
+	}
 
 	ret = mdss_mdp_ctl_update_fps(ctl);
 
@@ -2690,26 +2702,34 @@ int mdss_mdp_overlay_vsync_ctrl(struct msm_fb_data_type *mfd, int en)
 
 	if (!ctl)
 		return -ENODEV;
-	if (!ctl->ops.add_vsync_handler || !ctl->ops.remove_vsync_handler)
-		return -EOPNOTSUPP;
+
+	mutex_lock(&mdp5_data->ov_lock);
+	mutex_lock(&ctl->offlock);
+	if (!ctl->ops.add_vsync_handler || !ctl->ops.remove_vsync_handler) {
+		rc = -EOPNOTSUPP;
+		goto exit;
+	}
 	if (!ctl->panel_data->panel_info.cont_splash_enabled
-			&& !mdss_mdp_ctl_is_power_on(ctl)) {
+		&& (!mdss_mdp_ctl_is_power_on(ctl) ||
+		mdss_panel_is_power_on_ulp(ctl->power_state))) {
 		pr_debug("fb%d vsync pending first update en=%d\n",
 				mfd->index, en);
-		return -EPERM;
+		rc = -EPERM;
+		goto exit;
 	}
 
 	pr_debug("fb%d vsync en=%d\n", mfd->index, en);
 
-	mutex_lock(&mdp5_data->ov_lock);
 	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON);
 	if (en)
 		rc = ctl->ops.add_vsync_handler(ctl, &ctl->vsync_handler);
 	else
 		rc = ctl->ops.remove_vsync_handler(ctl, &ctl->vsync_handler);
 	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF);
-	mutex_unlock(&mdp5_data->ov_lock);
 
+exit:
+	mutex_unlock(&ctl->offlock);
+	mutex_unlock(&mdp5_data->ov_lock);
 	return rc;
 }
 
@@ -3803,7 +3823,8 @@ static int mdss_mdp_hw_cursor_update(struct msm_fb_data_type *mfd,
 		roi.x, roi.y, roi.w, roi.h, img->width, img->height,
 		cursor->enable, cursor->set);
 
-	cursor_frame_size = PAGE_ALIGN(img->width * img->height * 4);
+	cursor_frame_size = PAGE_ALIGN(MAX_CURSOR_IMG_WIDTH
+					* MAX_CURSOR_IMG_HEIGHT * 4);
 	if (!mfd->cursor_buf && (cursor->set & FB_CUR_SETIMAGE)) {
 		mfd->cursor_buf = dma_alloc_coherent(&mfd->pdev->dev,
 					cursor_frame_size,
@@ -3834,7 +3855,7 @@ static int mdss_mdp_hw_cursor_update(struct msm_fb_data_type *mfd,
 	if (cursor->set & FB_CUR_SETIMAGE) {
 		u32 cursor_addr;
 		ret = copy_from_user(mfd->cursor_buf, img->data,
-					cursor_frame_size);
+				img->width * img->height * 4);
 		if (ret) {
 			pr_err("copy_from_user error. rc=%d\n", ret);
 			mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF);
@@ -4315,16 +4336,20 @@ static int __mdss_overlay_src_split_sort(struct msm_fb_data_type *mfd,
 		__overlay_swap_func);
 
 	for (i = 0; i < num_ovs; i++) {
+		if (ovs[i].z_order >= MDSS_MDP_MAX_STAGE) {
+			pr_err("invalid stage:%u\n", ovs[i].z_order);
+			return -EINVAL;
+		}
 		if (ovs[i].dst_rect.x < left_lm_w) {
 			if (left_lm_zo_cnt[ovs[i].z_order] == 2) {
-				pr_err("more than 2 ov @ stage%d on left lm\n",
+				pr_err("more than 2 ov @ stage%u on left lm\n",
 					ovs[i].z_order);
 				return -EINVAL;
 			}
 			left_lm_zo_cnt[ovs[i].z_order]++;
 		} else {
 			if (right_lm_zo_cnt[ovs[i].z_order] == 2) {
-				pr_err("more than 2 ov @ stage%d on right lm\n",
+				pr_err("more than 2 ov @ stage%u on right lm\n",
 					ovs[i].z_order);
 				return -EINVAL;
 			}

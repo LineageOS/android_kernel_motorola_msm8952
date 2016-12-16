@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -32,6 +32,7 @@
 #include "mdss_debug.h"
 #include "mdss_dba_utils.h"
 #include "mdss_dsi_phy.h"
+#include "mdss_livedisplay.h"
 
 #define XO_CLK_RATE	19200000
 
@@ -670,8 +671,10 @@ static ssize_t mdss_dsi_cmd_state_write(struct file *file,
 		return -ENOMEM;
 	}
 
-	if (copy_from_user(input, p, count))
+	if (copy_from_user(input, p, count)) {
+		kfree(input);
 		return -EFAULT;
+	}
 	input[count-1] = '\0';
 
 	if (strnstr(input, "dsi_hs_mode", strlen("dsi_hs_mode")))
@@ -943,6 +946,9 @@ static int mdss_dsi_debugfs_init(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 	struct mdss_panel_data *pdata = &ctrl_pdata->panel_data;
 	int rc;
 
+	if (!pdata)
+		return -EINVAL;
+
 	do {
 		struct mdss_panel_info panel_info = pdata->panel_info;
 		if (panel_info.debugfs_info) {
@@ -971,6 +977,7 @@ static void mdss_dsi_debugfs_cleanup(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 		struct mdss_dsi_debugfs_info *dfs = ctrl->debugfs_info;
 		if (dfs && dfs->root)
 			debugfs_remove_recursive(dfs->root);
+		kfree(dfs);
 		pdata = pdata->next;
 	} while (pdata);
 	pr_debug("%s: Cleaned up mdss_dsi_debugfs_info\n", __func__);
@@ -1084,10 +1091,9 @@ static int mdss_dsi_off(struct mdss_panel_data *pdata, int power_state)
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
 
-	mutex_lock(&ctrl_pdata->mutex);
 	panel_info = &ctrl_pdata->panel_data.panel_info;
 
-	pr_debug("%s+: ctrl=%p ndx=%d power_state=%d\n",
+	pr_debug("%s+: ctrl=%pK ndx=%d power_state=%d\n",
 		__func__, ctrl_pdata, ctrl_pdata->ndx, power_state);
 	pr_info("%s[%d]+.\n", __func__, ctrl_pdata->ndx);
 
@@ -1131,7 +1137,6 @@ panel_power_ctrl:
 	/* Initialize Max Packet size for DCS reads */
 	ctrl_pdata->cur_max_pkt_size = 0;
 end:
-	mutex_unlock(&ctrl_pdata->mutex);
 	pr_debug("%s-:\n", __func__);
 
 	return ret;
@@ -1249,7 +1254,7 @@ int mdss_dsi_on(struct mdss_panel_data *pdata)
 		mdss_dsi_validate_debugfs_info(ctrl_pdata);
 
 	cur_power_state = pdata->panel_info.panel_power_state;
-	pr_debug("%s+: ctrl=%p ndx=%d cur_power_state=%d\n", __func__,
+	pr_debug("%s+: ctrl=%pK ndx=%d cur_power_state=%d\n", __func__,
 		ctrl_pdata, ctrl_pdata->ndx, cur_power_state);
 	pr_info("%s[%d]+.\n", __func__, ctrl_pdata->ndx);
 
@@ -1416,7 +1421,7 @@ static int mdss_dsi_unblank(struct mdss_panel_data *pdata)
 				panel_data);
 	mipi  = &pdata->panel_info.mipi;
 
-	pr_debug("%s+: ctrl=%p ndx=%d cur_power_state=%d\n", __func__,
+	pr_debug("%s+: ctrl=%pK ndx=%d cur_power_state=%d\n", __func__,
 		ctrl_pdata, ctrl_pdata->ndx,
 		pdata->panel_info.panel_power_state);
 
@@ -1440,7 +1445,6 @@ static int mdss_dsi_unblank(struct mdss_panel_data *pdata)
 				goto error;
 			}
 		}
-		ctrl_pdata->ctrl_state |= CTRL_STATE_PANEL_INIT;
 	}
 
 	if ((pdata->panel_info.type == MIPI_CMD_PANEL) &&
@@ -1449,6 +1453,11 @@ static int mdss_dsi_unblank(struct mdss_panel_data *pdata)
 		if (mdss_dsi_is_te_based_esd(ctrl_pdata))
 			enable_irq(gpio_to_irq(ctrl_pdata->disp_te_gpio));
 	}
+
+	ctrl_pdata->ctrl_state |= CTRL_STATE_PANEL_INIT;
+
+	mdss_livedisplay_update(pdata->panel_info.livedisplay,
+			MODE_UPDATE_ALL);
 
 error:
 	mdss_dsi_clk_ctrl(ctrl_pdata, DSI_ALL_CLKS, 0);
@@ -1475,7 +1484,7 @@ static int mdss_dsi_blank(struct mdss_panel_data *pdata, int power_state)
 				panel_data);
 	mipi = &pdata->panel_info.mipi;
 
-	pr_debug("%s+: ctrl=%p ndx=%d power_state=%d\n",
+	pr_debug("%s+: ctrl=%pK ndx=%d power_state=%d\n",
 		__func__, ctrl_pdata, ctrl_pdata->ndx, power_state);
 
 	mdss_dsi_clk_ctrl(ctrl_pdata, DSI_ALL_CLKS, 1);
@@ -1545,7 +1554,7 @@ static int mdss_dsi_post_panel_on(struct mdss_panel_data *pdata)
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
 
-	pr_debug("%s+: ctrl=%p ndx=%d\n", __func__,
+	pr_debug("%s+: ctrl=%pK ndx=%d\n", __func__,
 				ctrl_pdata, ctrl_pdata->ndx);
 
 	mdss_dsi_clk_ctrl(ctrl_pdata, DSI_ALL_CLKS, 1);
@@ -1577,7 +1586,7 @@ int mdss_dsi_cont_splash_on(struct mdss_panel_data *pdata)
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
 
-	pr_debug("%s+: ctrl=%p ndx=%d\n", __func__,
+	pr_debug("%s+: ctrl=%pK ndx=%d\n", __func__,
 				ctrl_pdata, ctrl_pdata->ndx);
 
 	WARN((ctrl_pdata->ctrl_state & CTRL_STATE_PANEL_INIT),
@@ -2026,6 +2035,15 @@ int mdss_dsi_register_recovery_handler(struct mdss_dsi_ctrl_pdata *ctrl,
 	return 0;
 }
 
+int mdss_dsi_register_mdp_callback(struct mdss_dsi_ctrl_pdata *ctrl,
+	struct mdss_intf_recovery *mdp_callback)
+{
+	mutex_lock(&ctrl->mutex);
+	ctrl->mdp_callback = mdp_callback;
+	mutex_unlock(&ctrl->mutex);
+	return 0;
+}
+
 static int mdss_dsi_clk_refresh(struct mdss_panel_data *pdata)
 {
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
@@ -2268,6 +2286,10 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 		break;
 	case MDSS_EVENT_REGISTER_RECOVERY_HANDLER:
 		rc = mdss_dsi_register_recovery_handler(ctrl_pdata,
+			(struct mdss_intf_recovery *)arg);
+		break;
+	case MDSS_EVENT_REGISTER_MDP_CALLBACK:
+		rc = mdss_dsi_register_mdp_callback(ctrl_pdata,
 			(struct mdss_intf_recovery *)arg);
 		break;
 	case MDSS_EVENT_DSI_DYNAMIC_SWITCH:
@@ -2692,7 +2714,7 @@ static int mdss_dsi_res_init(struct platform_device *pdev)
 		mdss_dsi_res->shared_data = devm_kzalloc(&pdev->dev,
 				sizeof(struct dsi_shared_data),
 				GFP_KERNEL);
-		pr_debug("%s Allocated shared_data=%p\n", __func__,
+		pr_debug("%s Allocated shared_data=%pK\n", __func__,
 				mdss_dsi_res->shared_data);
 		if (!mdss_dsi_res->shared_data) {
 			pr_err("%s Unable to alloc mem for shared_data\n",
@@ -2751,7 +2773,7 @@ static int mdss_dsi_res_init(struct platform_device *pdev)
 				rc = -ENOMEM;
 				goto mem_fail;
 			}
-			pr_debug("%s Allocated ctrl_pdata[%d]=%p\n",
+			pr_debug("%s Allocated ctrl_pdata[%d]=%pK\n",
 				__func__, i, mdss_dsi_res->ctrl_pdata[i]);
 			mdss_dsi_res->ctrl_pdata[i]->shared_data =
 				mdss_dsi_res->shared_data;
@@ -2761,7 +2783,7 @@ static int mdss_dsi_res_init(struct platform_device *pdev)
 	}
 
 	mdss_dsi_res->pdev = pdev;
-	pr_debug("%s: Setting up mdss_dsi_res=%p\n", __func__, mdss_dsi_res);
+	pr_debug("%s: Setting up mdss_dsi_res=%pK\n", __func__, mdss_dsi_res);
 
 	return 0;
 
@@ -3088,10 +3110,10 @@ int mdss_dsi_retrieve_ctrl_resources(struct platform_device *pdev, int mode,
 		return rc;
 	}
 
-	pr_info("%s: ctrl_base=%p ctrl_size=%x phy_base=%p phy_size=%x\n",
+	pr_info("%s: ctrl_base=%pK ctrl_size=%x phy_base=%pK phy_size=%x\n",
 		__func__, ctrl->ctrl_base, ctrl->reg_size, ctrl->phy_io.base,
 		ctrl->phy_io.len);
-	pr_info("%s: phy_regulator_base=%p phy_regulator_size=%x\n", __func__,
+	pr_info("%s: phy_regulator_base=%pK phy_regulator_size=%x\n", __func__,
 		ctrl->phy_regulator_io.base, ctrl->phy_regulator_io.len);
 
 	rc = msm_dss_ioremap_byname(pdev, &ctrl->mmss_misc_io,

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1033,6 +1033,8 @@ int mdss_mdp_mixer_pipe_unstage(struct mdss_mdp_pipe *pipe,
 void mdss_mdp_mixer_unstage_all(struct mdss_mdp_mixer *mixer);
 int mdss_mdp_display_commit(struct mdss_mdp_ctl *ctl, void *arg,
 	struct mdss_mdp_commit_cb *commit_cb);
+int mdss_mdp_display_commit_pp_post_vsync(struct mdss_mdp_ctl *ctl, void *arg,
+	struct mdss_mdp_commit_cb *commit_cb);
 int mdss_mdp_display_wait4comp(struct mdss_mdp_ctl *ctl);
 int mdss_mdp_display_wait4pingpong(struct mdss_mdp_ctl *ctl, bool use_lock);
 int mdss_mdp_display_wakeup_time(struct mdss_mdp_ctl *ctl,
@@ -1187,5 +1189,6 @@ int mdss_mdp_cmd_set_autorefresh_mode(struct mdss_mdp_ctl *ctl,
 		int frame_cnt);
 int mdss_mdp_ctl_cmd_autorefresh_enable(struct mdss_mdp_ctl *ctl,
 		int frame_cnt);
+int mdss_mdp_user_pcc_config(struct mdp_pcc_cfg_data *config);
 
 #endif /* MDSS_MDP_H */

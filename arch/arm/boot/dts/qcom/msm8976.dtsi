@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2016, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-201666666, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -62,7 +62,7 @@
 			linux,reserve-contiguous-region;
 			linux,reserve-region;
 			linux,remove-completely;
-			reg = <0x0 0x85E00000 0x0 0x0A00000>;
+			reg = <0x0 0x85b00000 0x0 0x0d00000>;
 			label = "other_ext_mem";
 		};
 
@@ -91,7 +91,7 @@
 
 		secure_mem: secure_region@0 {
 			linux,reserve-contiguous-region;
-			reg = <0x0 0x0 0x0 0x7A00000>;
+			reg = <0x0 0x0 0x0 0x8100000>;
 			label = "secure_mem";
 		};
 
@@ -1280,6 +1280,30 @@
 		qcom,pm-qos-latency = <59 150 10741>;
 	};
 
+	fsusb: qcom,ehci-host@79c0000 {
+		compatible = "qcom,ehci-host";
+		reg = <0x79c0000 0x400>;
+		interrupts = <0 132 0>;
+		status = "disabled";
+
+		clocks = <&clock_gcc clk_gcc_usb_fs_ahb_clk>,
+			 <&clock_gcc clk_gcc_usb_fs_system_clk>,
+			 <&clock_gcc clk_gcc_usb_fs_ic_clk>;
+			clock-names = "iface_clk", "core_clk", "alt_core_clk";
+
+		pinctrl-names = "uicc_active", "uicc_sleep";
+		pinctrl-0 = <&uicc_active>;
+		pinctrl-1 = <&uicc_sleep>;
+		HSUSB_3p3-supply = <&pm8950_l14>;
+
+		qcom,msm-bus,name = "uicc";
+		qcom,msm-bus,num-cases = <2>;
+		qcom,msm-bus,num-paths = <1>;
+		qcom,msm-bus,vectors-KBps =
+				<93 512 0 0>,
+				<93 512 12000 192000>;
+	};
+
 	slim_msm: slim@c140000{
 		cell-index = <1>;
 		compatible = "qcom,slim-ngd";
@@ -1587,9 +1611,9 @@
 		qcom,ce-opp-freq = <100000000>;
 	};
 
-	qcom_seecom: qseecom@85e00000 {
+	qcom_seecom: qseecom@85b00000 {
 		compatible = "qcom,qseecom";
-		reg = <0x85e00000 0x500000>;
+		reg = <0x85b00000 0x800000>;
 		reg-names = "secapp-region";
 		qcom,hlos-num-ce-hw-instances = <1>;
 		qcom,hlos-ce-hw-instance = <0>;
@@ -1851,13 +1875,13 @@
 		qcom,sw-power-collapse;
 		qcom,reset-clock-control;
 		qcom,regulator-scaling;
-		qcom,max-hw-load = <1011840>; /* 3840 x 2176 @ 30 fps + 3840 x 2176 @ 1 fps */
+		qcom,max-hw-load = <979200>; /* 3840 x 2176 @ 30 fps */
 		qcom,dcvs-min-load = <734400>; /* 1920 x 1088 @ 90fps */
 		qcom,dcvs-min-mbperframe = <32400>; /* 3840 x 2160 */
 
 		qcom,load-freq-tbl =
-			<979200 400000000 0xffffffff>, /* NOM+ , UHD30D   */
 			<979200 466000000 0x55555555>, /* TURBO, UHD30E   */
+			<979200 400000000 0xffffffff>, /* NOM+ , UHD30D   */
 			<734400 360000000 0xffffffff>, /* NOM  , 1080p90D */
 			<734400 400000000 0x55555555>, /* NOM+ , 1080p90E */
 			<489600 228570000 0xffffffff>, /* SVS  , 1080p60D */
@@ -2237,13 +2261,11 @@
 		reg = <0xc051000 0x4>,
 		    <0xc051004 0x4>,
 		    <0xc055000 0x4>,
-		    <0xc056000 0x4>,
 		    <0xc052000 0x4>;
 
 		reg-names = "csr_gp_io_mux_mic_ctl",
 			"csr_gp_io_mux_spkr_ctl",
 			"csr_gp_io_lpaif_pri_pcm_pri_mode_muxsel",
-			"csr_gp_io_lpaif_sec_pcm_sec_mode_muxsel",
 			"csr_gp_io_mux_quin_ctl";
 
 		qcom,audio-routing =
@@ -2298,8 +2320,7 @@
 				"msm-compress-dsp", "msm-pcm-hostless", "msm-pcm-afe",
 				"msm-lsm-client", "msm-pcm-routing", "msm-cpe-lsm",
 				"msm-pcm-lpa";
-		asoc-cpu = <&dai_pri_auxpcm>, <&dai_sec_auxpcm>, <&dai_hdmi>,
-				<&dai_mi2s_hdmi>,
+		asoc-cpu = <&dai_pri_auxpcm>, <&dai_hdmi>, <&dai_mi2s_hdmi>,
 				<&dai_mi2s2>, <&dai_mi2s3>, <&dai_mi2s5>,
 				<&sb_0_rx>, <&sb_0_tx>, <&sb_1_rx>, <&sb_1_tx>,
 				<&sb_2_rx>, <&sb_2_tx>, <&sb_3_rx>, <&sb_3_tx>,
@@ -2309,8 +2330,7 @@
 				<&incall_music_rx>, <&incall_music_2_rx>,
 				<&sb_5_rx>,  <&bt_sco_rx>,
 				<&bt_sco_tx>, <&int_fm_rx>, <&int_fm_tx>;
-		asoc-cpu-names = "msm-dai-q6-auxpcm.1", "msm-dai-q6-auxpcm.2",
-				"msm-dai-q6-hdmi.8",
+		asoc-cpu-names = "msm-dai-q6-auxpcm.1",	"msm-dai-q6-hdmi.8",
 				"msm-dai-q6-mi2s-hdmi.4118",
 				"msm-dai-q6-mi2s.2",
 				"msm-dai-q6-mi2s.3", "msm-dai-q6-mi2s.5",
@@ -2633,19 +2653,6 @@
 		qcom,msm-auxpcm-interface = "primary";
 	};
 
-	dai_sec_auxpcm: qcom,msm-sec-auxpcm {
-		compatible = "qcom,msm-auxpcm-dev";
-		qcom,msm-cpudai-auxpcm-mode = <0>, <0>;
-		qcom,msm-cpudai-auxpcm-sync = <1>, <1>;
-		qcom,msm-cpudai-auxpcm-frame = <5>, <4>;
-		qcom,msm-cpudai-auxpcm-quant = <2>, <2>;
-		qcom,msm-cpudai-auxpcm-num-slots = <1>, <1>;
-		qcom,msm-cpudai-auxpcm-slot-mapping = <1>, <1>;
-		qcom,msm-cpudai-auxpcm-data = <0>, <0>;
-		qcom,msm-cpudai-auxpcm-pcm-clk-rate = <2048000>, <2048000>;
-		qcom,msm-auxpcm-interface = "secondary";
-	};
-
 	qcom,msm-audio-ion {
 		compatible = "qcom,msm-audio-ion";
 		qcom,smmu-enabled;
@@ -2721,6 +2728,7 @@
 		/* GPIO output to mss */
 		qcom,gpio-force-stop = <&smp2pgpio_ssr_smp2p_1_out 0 0>;
 		linux,contiguous-region = <&modem_mem>;
+		qcom,mx-spike-wa;
 	};
 
 	mcd {
@@ -2742,6 +2750,15 @@
 		vdd-wlan-supply = <&rome_vreg>;
 		vdd-wlan-io-supply = <&pm8950_l5>;
 		qcom,wlan-ramdump-dynamic = <0x200000>;
+		qcom,cnss-enable-bus-bandwidth;
+		qcom,msm-bus,name = "msm-cnss";
+		qcom,msm-bus,num-cases = <4>;
+		qcom,msm-bus,num-paths = <1>;
+		qcom,msm-bus,vectors-KBps =
+				<79 512 0 0>,			/* No vote */
+				<79 512 6250 200000>,		/* 50 Mbps */
+				<79 512 25000 200000>,		/* 200 Mbps */
+				<79 512 2048000 4096000>;	/* MAX */
 		status = "disabled";
 	};
 
@@ -2750,6 +2767,7 @@
 		qcom,irq-is-percpu;
 		interrupts = <1 7 0xff00>;
 	};
+
 };
 
 #include "msm-pm8950-rpm-regulator.dtsi"

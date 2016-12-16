@@ -1,4 +1,4 @@
-/* Copyright (c) 2015, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -25,6 +25,7 @@
 #define CEC_BUF_SIZE    (MAX_CEC_FRAME_SIZE + 1)
 #define MAX_SWITCH_NAME_SIZE        5
 #define MSM_DBA_MAX_PCLK 148500
+#define DEFAULT_VIDEO_RESOLUTION HDMI_VFRMT_640x480p60_4_3
 
 struct mdss_dba_utils_data {
 	struct msm_dba_ops ops;
@@ -44,6 +45,7 @@ struct mdss_dba_utils_data {
 	struct cec_ops cops;
 	struct cec_cbs ccbs;
 	char disp_switch_name[MAX_SWITCH_NAME_SIZE];
+	u32 current_vic;
 };
 
 static struct mdss_dba_utils_data *mdss_dba_utils_get_data(
@@ -156,6 +158,30 @@ static ssize_t mdss_dba_utils_sysfs_rda_connected(struct device *dev,
 	return ret;
 }
 
+static ssize_t mdss_dba_utils_sysfs_rda_video_mode(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	ssize_t ret;
+	struct mdss_dba_utils_data *udata = NULL;
+
+	if (!dev) {
+		pr_debug("invalid device\n");
+		return -EINVAL;
+	}
+
+	udata = mdss_dba_utils_get_data(dev);
+
+	if (!udata) {
+		pr_debug("invalid input\n");
+		return -EINVAL;
+	}
+
+	ret = snprintf(buf, PAGE_SIZE, "%d\n", udata->current_vic);
+	pr_debug("'%d'\n", udata->current_vic);
+
+	return ret;
+}
+
 static ssize_t mdss_dba_utils_sysfs_wta_hpd(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t count)
 {
@@ -196,11 +222,15 @@ static ssize_t mdss_dba_utils_sysfs_wta_hpd(struct device *dev,
 static DEVICE_ATTR(connected, S_IRUGO,
 		mdss_dba_utils_sysfs_rda_connected, NULL);
 
+static DEVICE_ATTR(video_mode, S_IRUGO,
+		mdss_dba_utils_sysfs_rda_video_mode, NULL);
+
 static DEVICE_ATTR(hpd, S_IRUGO | S_IWUSR, NULL,
 		mdss_dba_utils_sysfs_wta_hpd);
 
 static struct attribute *mdss_dba_utils_fs_attrs[] = {
 	&dev_attr_connected.attr,
+	&dev_attr_video_mode.attr,
 	&dev_attr_hpd.attr,
 	NULL,
 };
@@ -496,6 +526,7 @@ int mdss_dba_utils_video_on(void *data, struct mdss_panel_info *pinfo)
 
 	/* Get scan information from EDID */
 	video_cfg.vic = mdss_dba_get_vic_panel_info(ud, pinfo);
+	ud->current_vic = video_cfg.vic;
 	video_cfg.scaninfo = hdmi_edid_get_sink_scaninfo(ud->edid_data,
 							video_cfg.vic);
 	if (ud->ops.video_on)
@@ -643,8 +674,12 @@ void *mdss_dba_utils_init(struct mdss_dba_utils_init_data *uid)
 	}
 
 	/* update edid data to retrieve it back in edid parser */
-	if (uid->pinfo)
+	if (uid->pinfo) {
 		uid->pinfo->edid_data = udata->edid_data;
+		/* Initialize to default resolution */
+		hdmi_edid_set_video_resolution(uid->pinfo->edid_data,
+					DEFAULT_VIDEO_RESOLUTION);
+	}
 
 	/* get edid buffer from edid parser */
 	udata->edid_buf = edid_init_data.buf;

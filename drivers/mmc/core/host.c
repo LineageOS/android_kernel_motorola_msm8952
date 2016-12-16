@@ -78,7 +78,8 @@ static int mmc_host_runtime_suspend(struct device *dev)
 		mmc_host_clk_hold(host);
 		host->cmdq_ops->enable(host);
 		mmc_host_clk_release(host);
-		if (mmc_cmdq_halt(host, false)) {
+		ret = mmc_cmdq_halt(host, false);
+		if (ret) {
 			pr_err("%s: halt: failed: %d\n", __func__, ret);
 			goto out;
 		}
@@ -182,13 +183,16 @@ static int mmc_host_suspend(struct device *dev)
 			       __func__, ret);
 		/* reset CQE state if host suspend fails */
 		if (ret < 0 && host->card && host->card->cmdq_init) {
+			int err = 0;
 			mmc_card_clr_suspended(host->card);
 			mmc_host_clk_hold(host);
 			host->cmdq_ops->enable(host);
 			mmc_host_clk_release(host);
-			if (mmc_cmdq_halt(host, false)) {
+			err = mmc_cmdq_halt(host, false);
+			if (err) {
 				mmc_release_host(host);
-				pr_err("%s: halt: failed: %d\n", __func__, ret);
+				pr_err("%s: halt: failed: %d\n",
+						__func__, err);
 				goto out;
 			}
 		}
@@ -208,10 +212,13 @@ static int mmc_host_suspend(struct device *dev)
 		spin_unlock_irqrestore(&host->clk_lock, flags);
 		mmc_set_ios(host);
 	}
-	spin_lock_irqsave(&host->clk_lock, flags);
-	host->dev_status = DEV_SUSPENDED;
-	spin_unlock_irqrestore(&host->clk_lock, flags);
 out:
+	spin_lock_irqsave(&host->clk_lock, flags);
+	if (ret)
+		host->dev_status = DEV_RESUMED;
+	else
+		host->dev_status = DEV_SUSPENDED;
+	spin_unlock_irqrestore(&host->clk_lock, flags);
 	return ret;
 }
 

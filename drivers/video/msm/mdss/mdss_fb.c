@@ -2,7 +2,7 @@
  * Core MDSS framebuffer driver.
  *
  * Copyright (C) 2007 Google Incorporated
- * Copyright (c) 2008-2015, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2008-2016, The Linux Foundation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -55,6 +55,8 @@
 #include "mdss_mdp_splash_logo.h"
 #define CREATE_TRACE_POINTS
 #include "mdss_debug.h"
+
+#include "mdss_livedisplay.h"
 
 #ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
 #define MDSS_FB_NUM 3
@@ -623,8 +625,8 @@ static ssize_t mdss_fb_force_panel_dead(struct device *dev,
 		return len;
 	}
 
-	if (sscanf(buf, "%d", &pdata->panel_info.panel_force_dead) != 1)
-		pr_err("sccanf buf error!\n");
+	if (kstrtouint(buf, 0, &pdata->panel_info.panel_force_dead))
+		pr_err("kstrtouint buf error\n");
 
 	return len;
 }
@@ -704,7 +706,7 @@ static int mdss_fb_blanking_mode_switch(struct msm_fb_data_type *mfd, int mode)
 	unlock_fb_info(mfd->fbi);
 
 	mutex_lock(&mfd->bl_lock);
-	mfd->bl_updated = true;
+	mfd->allow_bl_update = true;
 	mdss_fb_set_backlight(mfd, bl_lvl);
 	mutex_unlock(&mfd->bl_lock);
 
@@ -737,8 +739,8 @@ static ssize_t mdss_fb_change_dfps_mode(struct device *dev,
 	}
 	pinfo = &pdata->panel_info;
 
-	if (sscanf(buf, "%d", &dfps_mode) != 1) {
-		pr_err("sccanf buf error!\n");
+	if (kstrtouint(buf, 0, &dfps_mode)) {
+		pr_err("kstrtouint buf error\n");
 		return len;
 	}
 
@@ -1103,6 +1105,8 @@ static int mdss_fb_create_sysfs(struct msm_fb_data_type *mfd)
 	if (rc)
 		pr_err("panel parameter sysfs creation failed, rc=%d\n", rc);
 
+    return mdss_livedisplay_create_sysfs(mfd);
+
 err:
 	return rc;
 }
@@ -1321,6 +1325,8 @@ static int mdss_fb_remove(struct platform_device *pdev)
 
 	if (mfd->key != MFD_KEY)
 		return -EINVAL;
+
+	mdss_panel_debugfs_cleanup(mfd->panel_info);
 
 	if (mdss_fb_suspend_sub(mfd))
 		pr_err("msm_fb_remove: can't stop the device %d\n",
@@ -1579,7 +1585,7 @@ void mdss_fb_set_backlight(struct msm_fb_data_type *mfd, u32 bkl_lvl)
 	bool bl_notify_needed = false;
 
 	if ((((mdss_fb_is_power_off(mfd) && mfd->dcm_state != DCM_ENTER)
-		|| !mfd->bl_updated) && !IS_CALIB_MODE_BL(mfd)) ||
+		|| !mfd->allow_bl_update) && !IS_CALIB_MODE_BL(mfd)) ||
 		mfd->panel_info->cont_splash_enabled) {
 		mfd->unset_bl_level = bkl_lvl;
 		return;
@@ -1630,7 +1636,7 @@ void mdss_fb_update_backlight(struct msm_fb_data_type *mfd)
 	if (!mfd->unset_bl_level)
 		return;
 	mutex_lock(&mfd->bl_lock);
-	if (!mfd->bl_updated) {
+	if (!mfd->allow_bl_update) {
 		pdata = dev_get_platdata(&mfd->pdev->dev);
 		if ((pdata) && (pdata->set_backlight)) {
 			mfd->bl_level = mfd->unset_bl_level;
@@ -1638,12 +1644,11 @@ void mdss_fb_update_backlight(struct msm_fb_data_type *mfd)
 			if (mfd->mdp.ad_calc_bl)
 				(*mfd->mdp.ad_calc_bl)(mfd, temp, &temp,
 								&bl_notify);
-			if (bl_notify)
-				sysfs_notify(&mfd->fbi->dev->kobj, NULL,
-								"pp_bl_event");
+
+			sysfs_notify(&mfd->fbi->dev->kobj, NULL, "pp_bl_event");
 			pdata->set_backlight(pdata, temp);
 			mfd->bl_level_scaled = mfd->unset_bl_level;
-			mfd->bl_updated = 1;
+			mfd->allow_bl_update = true;
 		}
 	}
 	mutex_unlock(&mfd->bl_lock);
@@ -1740,7 +1745,7 @@ static int mdss_fb_blank_blank(struct msm_fb_data_type *mfd,
 			mdss_fb_stop_disp_thread(mfd);
 		mutex_lock(&mfd->bl_lock);
 		mdss_fb_set_backlight(mfd, 0);
-		mfd->bl_updated = 0;
+		mfd->allow_bl_update = false;
 		mfd->unset_bl_level = current_bl;
 		mutex_unlock(&mfd->bl_lock);
 	}
@@ -1808,8 +1813,8 @@ static int mdss_fb_blank_unblank(struct msm_fb_data_type *mfd)
 		mdss_fb_restore_param(mfd);
 
 		mutex_lock(&mfd->bl_lock);
-		if (!mfd->bl_updated) {
-			mfd->bl_updated = 1;
+		if (!mfd->allow_bl_update) {
+			mfd->allow_bl_update = true;
 			/*
 			 * 1.) If in AD calibration mode then frameworks would
 			 * not be allowed to update backlight hence post unblank
@@ -1828,6 +1833,13 @@ static int mdss_fb_blank_unblank(struct msm_fb_data_type *mfd)
 			else if (!mfd->panel_info->mipi.post_init_delay ||
 				cur_panel_dead)
 				mdss_fb_set_backlight(mfd, mfd->unset_bl_level);
+
+			/*
+			 * it blocks the backlight update between unblank and
+			 * first kickoff to avoid backlight turn on before black
+			 * frame is transferred to panel through unblank call.
+			 */
+			mfd->allow_bl_update = false;
 		}
 		mutex_unlock(&mfd->bl_lock);
 	}
@@ -2024,7 +2036,7 @@ void mdss_fb_free_fb_ion_memory(struct msm_fb_data_type *mfd)
 int mdss_fb_alloc_fb_ion_memory(struct msm_fb_data_type *mfd, size_t fb_size)
 {
 	unsigned long buf_size;
-	int rc;
+	int rc = 0;
 	void *vaddr;
 
 	if (!mfd) {
@@ -2077,7 +2089,7 @@ int mdss_fb_alloc_fb_ion_memory(struct msm_fb_data_type *mfd, size_t fb_size)
 		goto fb_mmap_failed;
 	}
 
-	pr_debug("alloc 0x%zuB vaddr = %p (%pa iova) for fb%d\n", fb_size,
+	pr_debug("alloc 0x%zuB vaddr = %pK (%pa iova) for fb%d\n", fb_size,
 			vaddr, &mfd->iova, mfd->index);
 
 	mfd->fbi->screen_base = (char *) vaddr;
@@ -2170,7 +2182,7 @@ static int mdss_fb_fbmem_ion_mmap(struct fb_info *info,
 				vma->vm_page_prot =
 					pgprot_writecombine(vma->vm_page_prot);
 
-			pr_debug("vma=%p, addr=%x len=%ld\n",
+			pr_debug("vma=%pK, addr=%x len=%ld\n",
 					vma, (unsigned int)addr, len);
 			pr_debug("vm_start=%x vm_end=%x vm_page_prot=%ld\n",
 					(unsigned int)vma->vm_start,
@@ -2340,7 +2352,7 @@ static int mdss_fb_alloc_fbmem_iommu(struct msm_fb_data_type *mfd, int dom)
 	if (rc)
 		pr_warn("Cannot map fb_mem %pa to IOMMU. rc=%d\n", &phys, rc);
 
-	pr_debug("alloc 0x%zxB @ (%pa phys) (0x%p virt) (%pa iova) for fb%d\n",
+	pr_debug("alloc 0x%zxB @ (%pa phys) (0x%pK virt) (%pa iova) for fb%d\n",
 		 size, &phys, virt, &mfd->iova, mfd->index);
 
 	mfd->fbi->screen_base = virt;

@@ -1768,6 +1768,9 @@ struct sdhci_msm_pltfm_data *sdhci_msm_populate_pdata(struct device *dev,
 	if (of_get_property(np, "qcom,nonremovable", NULL))
 		pdata->nonremovable = true;
 
+	if (of_get_property(np, "qcom,broken-pwr-cycle-host", NULL))
+		pdata->broken_pwr_cycle_host = true;
+
 	if (of_get_property(np, "qcom,modified-dynamic-qos", NULL))
 		pdata->use_mod_dynamic_qos = true;
 
@@ -3753,6 +3756,8 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 	host->quirks2 |= SDHCI_QUIRK2_BROKEN_PRESET_VALUE;
 	host->quirks2 |= SDHCI_QUIRK2_USE_RESERVED_MAX_TIMEOUT;
 	host->quirks2 |= SDHCI_QUIRK2_BROKEN_LED_CONTROL;
+	host->quirks2 |= SDHCI_QUIRK2_NON_STANDARD_TUNING;
+	host->quirks2 |= SDHCI_QUIRK2_USE_PIO_FOR_EMMC_TUNING;
 
 	if (host->quirks2 & SDHCI_QUIRK2_ALWAYS_USE_BASE_CLOCK)
 		host->quirks2 |= SDHCI_QUIRK2_DIVIDE_TOUT_BY_4;
@@ -3828,6 +3833,9 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 
 	if (msm_host->pdata->nonremovable)
 		msm_host->mmc->caps |= MMC_CAP_NONREMOVABLE;
+
+	if (msm_host->pdata->broken_pwr_cycle_host)
+		msm_host->mmc->caps2 |= MMC_CAP2_BROKEN_PWR_CYCLE;
 
 	if (msm_host->pdata->nonhotplug)
 		msm_host->mmc->caps2 |= MMC_CAP2_NONHOTPLUG;
