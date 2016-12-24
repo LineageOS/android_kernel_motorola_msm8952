@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014, 2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -219,18 +219,17 @@ typedef struct sUapsdInfo {
 
 #define WLANHAL_RX_BD_GET_TIMESTAMP(_pvBDHeader)    (((tpHalRxBd)_pvBDHeader)->mclkRxTimestamp)
 
-#define tHalFcRxBd       halFcRxBd_type             
+#define tHalFcRxBd       halFcRxBd_type
 #define tpHalFcRxBd      phalFcRxBd_type
 #define tHalFcTxBd       halFcTxBd_type
-#define tpHalFcTxBd      pHalFcTxBd_type              
+#define tpHalFcTxBd      pHalFcTxBd_type
 #define tHalFcTxParams   tFcTxParams_type
-#define tHalFcRxParams   tFcRxParams_type               
-#define tpHalFcTxParams  pFcTxParams_type               
-#define tpHalFcRxParams  pFcRxParams_type             
+#define tHalFcRxParams   tFcRxParams_type
+#define tpHalFcTxParams  pFcTxParams_type
 
 /*------------ RSSI and SNR Information extraction -------------*/
 #define WLANHAL_RX_BD_GET_RSSI0( _pvBDHeader )  \
-    (((((tpHalRxBd)_pvBDHeader)->phyStats0) >> 24) & 0xff)
+    (((((tpHalRxBd)_pvBDHeader)->phyStats0) >> 24) & 0x7f)
 #define WLANHAL_RX_BD_GET_RSSI1( _pvBDHeader )  \
     (((((tpHalRxBd)_pvBDHeader)->phyStats0) >> 16) & 0xff)
 #define WLANHAL_RX_BD_GET_RSSI2( _pvBDHeader )  \
@@ -336,10 +335,12 @@ tANI_U8 WLANHAL_RxBD_GetFrameTypeSubType(v_PVOID_t _pvBDHeader, tANI_U16 usFrmCt
 #define HAL_USE_PEER_STA_REQUESTED_MASK   0x80 //bit 7 will be used to control frames for p2p interface
 
 #ifdef FEATURE_WLAN_TDLS
-#define HAL_TDLS_PEER_STA_MASK              0x80 //bit 7 set for TDLS peer station 
+#define HAL_TDLS_PEER_STA_MASK              0x80 //bit 7 set for TDLS peer station
 #endif
 
-#define HAL_RELIABLE_MCAST_REQUESTED_MASK   0x100
+#ifdef WLAN_FEATURE_RMC
+#define HAL_RMC_REQUESTED_MASK   0x100
+#endif
 
 #define HAL_USE_BD_RATE_1_MASK              0x1000 // bit 12 for BD RATE 1
 #define HAL_USE_BD_RATE_2_MASK              0x2000 // bit 13 for BD RATE 1
@@ -349,17 +350,17 @@ tANI_U8 WLANHAL_RxBD_GetFrameTypeSubType(v_PVOID_t _pvBDHeader, tANI_U16 usFrmCt
 
   FUNCTION    WLANHAL_FillTxBd
 
-  DESCRIPTION 
-    Called by PE to register as a client for management frames delivery. 
+  DESCRIPTION
+    Called by PE to register as a client for management frames delivery.
 
-  DEPENDENCIES 
-    TL must be initialized before this API can be called. 
-    
-  PARAMETERS 
+  DEPENDENCIES
+    TL must be initialized before this API can be called.
+
+  PARAMETERS
 
     IN
-    pAdapter:       pointer to the global adapter context;a handle to TL's 
-                    control block can be extracted from its context 
+    pAdapter:       pointer to the global adapter context;a handle to TL's
+                    control block can be extracted from its context
     vosFrmBuf:     pointer to a vOSS buffer containing the management  
                     frame to be transmitted
     usFrmLen:       the length of the frame to be transmitted; information 
