@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5f681702_fe87430e",
+        "filename": "drivers/staging/prima/CORE/WDA/inc/legacy/wlan_qct_hal.h",
+        "patchSetId": 2
+      },
+      "lineNbr": 230,
+      "author": {
+        "id": 16327
+      },
+      "writtenOn": "2016-12-25T00:23:12Z",
+      "side": 1,
+      "message": "Please put something in your editor to ignore trailing whitespaces",
+      "revId": "3f8c93bb87fe4ae99003ba814f5896c951668760",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
