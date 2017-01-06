@@ -810,6 +810,16 @@ static void ipa_sps_irq_control(struct ipa_sys_context *sys, bool enable)
 {
 	int ret;
 
+	/*
+	 * Do not change sps config in case we are in polling mode as this
+	 * indicates that sps driver already notified EOT event and sps config
+	 * should not change until ipa driver processes the packet.
+	 */
+	if (atomic_read(&sys->curr_polling_state)) {
+		IPADBG("in polling mode, do not change config\n");
+		return;
+	}
+
 	if (enable) {
 		ret = sps_get_config(sys->ep->ep_hdl, &sys->ep->connect);
 		if (ret) {
@@ -2773,8 +2783,6 @@ static int ipa_assign_policy(struct ipa_sys_connect_params *in,
 					sys->pyld_hdlr = ipa_wan_rx_pyld_hdlr;
 					sys->rx_pool_sz =
 						ipa_ctx->wan_rx_ring_size;
-					in->ipa_ep_cfg.aggr.aggr_sw_eof_active
-						= true;
 					if (ipa_ctx->
 					ipa_client_apps_wan_cons_agg_gro) {
 						IPAERR("get close-by %u\n",
